@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { errorToast, successToast } from "../../utils/toast";
 import { getApiErrorMessage } from "../../utils/apiError";
 import * as authApi from "../../api/auth";
 
-const LandRegistration = () => {
+const EditLand = () => {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const landData = (location.state as any)?.land;
 
   const [formValues, setFormValues] = useState({
     ownerName: "",
@@ -18,11 +21,28 @@ const LandRegistration = () => {
     state: "",
   });
 
-  const [formData, setFormData] = useState<FormData | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [existingDocuments, setExistingDocuments] = useState<any[]>([]);
   const [states, setStates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Initialize form with land data
+  useEffect(() => {
+    if (landData) {
+      setFormValues({
+        ownerName: landData.ownerName || "",
+        longitude: landData.longitude || 0,
+        latitude: landData.latitude || 0,
+        totalSquareMeters: landData.squareMeters || 0,
+        ownershipType: landData.ownershipType || "",
+        purpose: landData.purpose || "",
+        titleType: landData.titleType || "",
+        state: landData.stateId || "",
+      });
+      setExistingDocuments(landData.documents || []);
+    }
+  }, [landData]);
 
   // Fetch States on Component Mount
   useEffect(() => {
@@ -57,76 +77,30 @@ const LandRegistration = () => {
       const newFiles = Array.from(e.target.files) as File[];
       const updatedFiles = [...uploadedFiles, ...newFiles];
       setUploadedFiles(updatedFiles);
-
-      const formDataObj = new FormData();
-
-      // Append form values to FormData
-      formDataObj.append("ownerName", formValues.ownerName);
-      formDataObj.append("longitude", formValues.longitude.toString());
-      formDataObj.append("latitude", formValues.latitude.toString());
-      formDataObj.append(
-        "squareMeters",
-        formValues.totalSquareMeters.toString()
-      );
-      formDataObj.append("ownershipType", formValues.ownershipType);
-      formDataObj.append("purpose", formValues.purpose);
-      formDataObj.append("titleType", formValues.titleType);
-      formDataObj.append("state", formValues.state);
-
-      // Append all files
-      updatedFiles.forEach((file) => {
-        formDataObj.append("documents", file);
-      });
-
-      setFormData(formDataObj);
-      // Reset file input
       e.target.value = "";
     }
   };
 
-  // Remove File
-  const removeFile = (index: number) => {
-    const updatedFiles = uploadedFiles.filter((_, i) => i !== index);
-    setUploadedFiles(updatedFiles);
+  // Remove New File
+  const removeNewFile = (index: number) => {
+    setUploadedFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
+  };
 
-    const formDataObj = new FormData();
-
-    // Append form values to FormData
-    formDataObj.append("ownerName", formValues.ownerName);
-    formDataObj.append("longitude", formValues.longitude.toString());
-    formDataObj.append("latitude", formValues.latitude.toString());
-    formDataObj.append(
-      "squareMeters",
-      formValues.totalSquareMeters.toString()
+  // Remove Existing Document
+  const removeExistingDocument = (docId: string) => {
+    setExistingDocuments((prevDocs) =>
+      prevDocs.filter((doc) => doc.id !== docId)
     );
-    formDataObj.append("ownershipType", formValues.ownershipType);
-    formDataObj.append("purpose", formValues.purpose);
-    formDataObj.append("titleType", formValues.titleType);
-    formDataObj.append("stateId", formValues.state);
-
-    // Append remaining files
-    updatedFiles.forEach((file) => {
-      formDataObj.append("documents", file);
-    });
-
-    setFormData(formDataObj);
   };
 
   // Validate Required Fields Before Submitting
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     if (!formValues.ownerName) newErrors.ownerName = "Owner name is required.";
-    if (!formValues.longitude) newErrors.longitude = "Longitude is required.";
-    if (!formValues.latitude) newErrors.latitude = "Latitude is required.";
-    if (!formValues.totalSquareMeters)
-      newErrors.totalSquareMeters = "Total square meters is required.";
     if (!formValues.ownershipType)
       newErrors.ownershipType = "Ownership type is required.";
     if (!formValues.purpose) newErrors.purpose = "Purpose is required.";
     if (!formValues.titleType) newErrors.titleType = "Title type is required.";
-    if (!formValues.state) newErrors.state = "State is required.";
-    if (!formData || formData.getAll("documents").length === 0)
-      newErrors.documents = "At least one document is required.";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -134,37 +108,32 @@ const LandRegistration = () => {
   // Handle Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) {
+    if (!validateForm() || !id) {
       return;
     }
 
     setLoading(true);
 
-    // Create FormData with current form values and files
-    const formDataObj = new FormData();
-    formDataObj.append("ownerName", formValues.ownerName);
-    formDataObj.append("longitude", formValues.longitude.toString());
-    formDataObj.append("latitude", formValues.latitude.toString());
-    formDataObj.append("squareMeters", formValues.totalSquareMeters.toString());
-    formDataObj.append("ownershipType", formValues.ownershipType);
-    formDataObj.append("purpose", formValues.purpose);
-    formDataObj.append("titleType", formValues.titleType);
-    formDataObj.append("stateId", formValues.state);
-
-    // Append all files
-    uploadedFiles.forEach((file) => {
-      formDataObj.append("documents", file);
-    });
-
-    console.log("Forms Submitted Successfully!", formDataObj);
-
     try {
-      const response = await authApi.landRegisteration(formDataObj);
-      console.log("Land registration response:", response);
-      successToast("Land registered successfully!");
+      // Create FormData with only the fields accepted by the backend
+      const formDataObj = new FormData();
+      formDataObj.append("ownerName", formValues.ownerName);
+      formDataObj.append("ownershipType", formValues.ownershipType);
+      formDataObj.append("purpose", formValues.purpose);
+      formDataObj.append("titleType", formValues.titleType);
+
+      // Append new files only
+      uploadedFiles.forEach((file) => {
+        formDataObj.append("documents", file);
+      });
+
+      console.log("Updating land:", formDataObj);
+      const response = await authApi.updateLand(id, formDataObj);
+      console.log("Land update response:", response);
+      successToast("Land details updated successfully!");
       navigate("/dashboard/list-of-registrations");
     } catch (error: any) {
-      console.error("Land registration error:", error);
+      console.error("Land update error:", error);
       const errorMsg = getApiErrorMessage(error);
       errorToast(errorMsg);
     } finally {
@@ -188,14 +157,14 @@ const LandRegistration = () => {
             </button>
           </li>
           <li>/</li>
-          <li className="text-gray-800">New Land Registration</li>
+          <li className="text-gray-800">Edit Land Details</li>
         </ol>
       </nav>
 
       {/* Form Title */}
-      <h1 className="text-2xl font-bold mb-4">New Land Registration</h1>
+      <h1 className="text-2xl font-bold mb-4">Edit Land Details</h1>
       <p className="text-gray-600 mb-6">
-        Register new land information here. Click save when you're done.
+        Update land information here. Click save when you're done.
       </p>
 
       {/* Form */}
@@ -208,36 +177,43 @@ const LandRegistration = () => {
               name: "ownerName",
               type: "text",
               placeholder: "Owner Name",
+              disabled: false,
             },
             {
               label: "Latitude",
               name: "latitude",
               type: "number",
               placeholder: "Latitude",
+              disabled: true,
             },
             {
               label: "Longitude",
               name: "longitude",
               type: "number",
               placeholder: "Longitude",
+              disabled: true,
             },
             {
               label: "Total Square Meters",
               name: "totalSquareMeters",
               type: "number",
               placeholder: "Total Square Meters",
+              disabled: true,
             },
-          ].map(({ label, name, type, placeholder }) => (
+          ].map(({ label, name, type, placeholder, disabled }) => (
             <div key={name} className="mb-4">
               <label className="block text-sm font-medium text-gray-700">
-                {label}
+                {label} {disabled && <span className="text-gray-500">(Read-only)</span>}
               </label>
               <input
                 type={type}
                 name={name}
                 value={(formValues as any)[name]}
                 onChange={handleChange}
-                className="border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:border-blue-500"
+                disabled={disabled}
+                className={`border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:border-blue-500 ${
+                  disabled ? "bg-gray-100 cursor-not-allowed" : ""
+                }`}
                 placeholder={placeholder}
               />
               {errors[name] && (
@@ -257,8 +233,8 @@ const LandRegistration = () => {
             className="border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:border-blue-500"
           >
             <option value="">Select Ownership Type</option>
-            <option value="government">Government</option>
-            <option value="private">Private</option>
+            <option value="Government">Government</option>
+            <option value="Private">Private</option>
           </select>
           {errors.ownershipType && (
             <p className="text-red-500 text-sm">{errors.ownershipType}</p>
@@ -275,8 +251,8 @@ const LandRegistration = () => {
             className="border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:border-blue-500"
           >
             <option value="">Select Purpose</option>
-            <option value="agriculture">Agriculture</option>
-            <option value="private-property-dev">
+            <option value="Agriculture">Agriculture</option>
+            <option value="Private Property Development">
               Private Property Development
             </option>
           </select>
@@ -286,13 +262,14 @@ const LandRegistration = () => {
 
           {/* State */}
           <label className="block text-sm font-medium text-gray-700 mt-4">
-            State
+            State <span className="text-gray-500">(Read-only)</span>
           </label>
           <select
             name="state"
             value={formValues.state}
             onChange={handleChange}
-            className="border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:border-blue-500"
+            disabled
+            className="border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:border-blue-500 bg-gray-100 cursor-not-allowed"
           >
             <option value="">Select State</option>
             {states.map((state: any) => (
@@ -319,17 +296,50 @@ const LandRegistration = () => {
             className="border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:border-blue-500"
           >
             <option value="">Select Title Type</option>
-            <option value="c-of-o">C of O</option>
-            <option value="right-of-occupancy">Right of Occupancy</option>
-            <option value="governors-consent">Governor's Consent</option>
+            <option value="C of O">C of O</option>
+            <option value="Right of Occupancy">Right of Occupancy</option>
+            <option value="Governor's Consent">Governor's Consent</option>
           </select>
           {errors.titleType && (
             <p className="text-red-500 text-sm">{errors.titleType}</p>
           )}
 
-          {/* File Upload */}
+          {/* Existing Documents */}
+          {existingDocuments.length > 0 && (
+            <div className="mt-4 p-4 bg-blue-50 rounded-md border border-blue-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                Current Documents ({existingDocuments.length})
+              </h3>
+              <ul className="space-y-2">
+                {existingDocuments.map((doc) => (
+                  <li
+                    key={doc.id}
+                    className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded"
+                  >
+                    <a
+                      href={doc.documentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:text-blue-800 truncate flex-1"
+                    >
+                      📄 {doc.fileName}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => removeExistingDocument(doc.id)}
+                      className="ml-2 text-red-500 hover:text-red-700 font-semibold text-sm"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Upload New Documents */}
           <label className="block text-sm font-medium text-gray-700 mt-4">
-            Upload Documents
+            Add New Documents
           </label>
           <input
             type="file"
@@ -339,11 +349,11 @@ const LandRegistration = () => {
           />
           <p className="text-sm text-gray-500 mt-2">Formats: PDF, PNG, JPG</p>
 
-          {/* Uploaded Files List */}
+          {/* New Uploaded Files List */}
           {uploadedFiles.length > 0 && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
+            <div className="mt-4 p-4 bg-green-50 rounded-md border border-green-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Uploaded Documents ({uploadedFiles.length})
+                New Documents ({uploadedFiles.length})
               </h3>
               <ul className="space-y-2">
                 {uploadedFiles.map((file, index) => (
@@ -356,7 +366,7 @@ const LandRegistration = () => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => removeFile(index)}
+                      onClick={() => removeNewFile(index)}
                       className="ml-2 text-red-500 hover:text-red-700 font-semibold text-sm"
                     >
                       ✕
@@ -366,45 +376,50 @@ const LandRegistration = () => {
               </ul>
             </div>
           )}
-
-          {errors.documents && (
-            <p className="text-red-500 text-sm mt-2">{errors.documents}</p>
-          )}
         </div>
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-green-500 text-white px-4 py-2 mt-8 rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {loading && (
-            <svg
-              className="animate-spin h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-          )}
-          {loading ? "Submitting..." : "Save Land Registration"}
-        </button>
+        {/* Action Buttons */}
+        <div className="col-span-1 md:col-span-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard/list-of-registrations")}
+            className="flex-1 bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-300 font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+          >
+            {loading && (
+              <svg
+                className="animate-spin h-5 w-5"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            )}
+            {loading ? "Updating..." : "Update Land"}
+          </button>
+        </div>
       </form>
     </div>
   );
 };
 
-export default LandRegistration;
+export default EditLand;

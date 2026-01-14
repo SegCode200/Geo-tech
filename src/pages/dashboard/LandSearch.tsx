@@ -1,112 +1,126 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import { FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
+import { useLandSearch } from "../../hooks/useHooks";
 
-interface SearchData {
-  longitude: string;
-  latitude: string;
-}
+const LandSearch = () => {
+  const [longitude, setLongitude] = useState<string>("");
+  const [latitude, setLatitude] = useState<string>("");
+  const [submitted, setSubmitted] = useState(false);
 
-const LandSearch: React.FC = () => {
-  const [searchData, setSearchData] = useState<SearchData>({
-    longitude: "",
-    latitude: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const lon = submitted ? parseFloat(longitude) : undefined;
+  const lat = submitted ? parseFloat(latitude) : undefined;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setSearchData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  console.log(lon)
+  console.log(lat)
+
+  const { data, error, isLoading } = useLandSearch(lon, lat);
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setResult(null);
 
-    // Validate Longitude and Latitude
-    const lon = parseFloat(searchData.longitude);
-    const lat = parseFloat(searchData.latitude);
-    if (isNaN(lon) || isNaN(lat)) {
-      setError("Please enter valid longitude and latitude values.");
+    if (isNaN(Number(longitude)) || isNaN(Number(latitude))) {
+      alert("Invalid coordinates");
       return;
     }
 
-    setLoading(true);
-
-    try {
-      // Placeholder API call (Replace with actual API request)
-      const response = await fetch(
-        `https://your-api.com/land-search?longitude=${lon}&latitude=${lat}`
-      );
-      const data = await response.json();
-      setResult(data);
-    } catch (err) {
-      setError("Failed to fetch land details. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    setSubmitted(true);
   };
+  console.log(data)
 
   return (
-    <div className="container mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-4">Land Search</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6">
+      <h1 className="text-2xl font-bold mb-4">
+        Check Land Availability
+      </h1>
+
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white p-6 rounded-lg shadow space-y-4"
+      >
         <div>
-          <label
-            htmlFor="longitude"
-            className="block text-sm font-medium text-gray-700"
-          >
+          <label className="block text-sm font-medium">
             Longitude
           </label>
           <input
-            type="text"
-            id="longitude"
-            name="longitude"
-            value={searchData.longitude}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter longitude"
+            value={longitude}
+            onChange={(e) => setLongitude(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            placeholder="3.3792"
           />
         </div>
+
         <div>
-          <label
-            htmlFor="latitude"
-            className="block text-sm font-medium text-gray-700"
-          >
+          <label className="block text-sm font-medium">
             Latitude
           </label>
           <input
-            type="text"
-            id="latitude"
-            name="latitude"
-            value={searchData.latitude}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter latitude"
+            value={latitude}
+            onChange={(e) => setLatitude(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            placeholder="6.5244"
           />
         </div>
 
-        {/* Error Message */}
-        {error && <p className="text-red-500">{error}</p>}
-
         <button
           type="submit"
-          disabled={loading}
-          className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
         >
-          {loading ? "Searching..." : "Search"}
+          Check Land
         </button>
       </form>
 
-      {/* Display Search Results */}
-      {result && (
-        <div className="mt-6 bg-gray-100 p-4 rounded">
-          <h2 className="text-lg font-semibold">Search Results:</h2>
-          <pre className="text-sm">{JSON.stringify(result, null, 2)}</pre>
+      {/* RESULTS */}
+      {submitted && (
+        <div className="mt-6">
+          {isLoading && <p>Checking land records...</p>}
+
+          {error && (
+            <p className="text-red-600">
+              Failed to check land
+            </p>
+          )}
+
+          {data && (
+            <div className="bg-gray-50 p-5 rounded-lg border">
+              {data.exists ? (
+                <>
+                  <h2 className="text-red-600 font-semibold flex items-center gap-2">
+                    <FaExclamationTriangle />
+                    Land Already Registered
+                  </h2>
+
+                  <ul className="mt-4 space-y-3">
+                    {data.lands.map((land: any) => (
+                      <li
+                        key={land.id}
+                        className="bg-white border p-3 rounded"
+                      >
+                        <p className="font-semibold">
+                          {land.ownerName}
+                        </p>
+                        <p className="text-sm">
+                          Purpose: {(land.purpose).toUpperCase()}
+                        </p>
+                        <p className="text-sm">
+                          Ownership Type: {(land.ownershipType).toUpperCase()}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Distance:{" "}
+                          {Math.round(land.squareMeters)} sqm
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-green-600 flex items-center gap-2">
+                  <FaCheckCircle />
+                  No land record found. You may proceed.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

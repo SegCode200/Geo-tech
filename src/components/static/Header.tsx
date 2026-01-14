@@ -1,14 +1,23 @@
 import img from "../../assets/profile.jpg"
-import { FaSearch, FaBell } from 'react-icons/fa';
+import { FaBell } from 'react-icons/fa';
+import { useAppSelector } from "../../store/hooks";
 
-const Header = () => {
+type HeaderProps = {
+  onToggleSidebar?: () => void;
+};
+
+const Header = ({ onToggleSidebar }: HeaderProps) => {
+  const { user } = useAppSelector((s) => s.auth);
+  
   return (
-    <header className="py-6  px-4 flex justify-between items-center">
-      {/* Logo */}
-
-      {/* Search Bar */}
-      <div className="flex-grow flex items-center ">
-        <span className="text-[30px] font-semibold">Welcome, Gilbert Obaseki</span>
+    <header className="py-4 px-0 md:px-4 flex justify-between items-center">
+      <div className="flex items-center gap-3">
+        <button onClick={onToggleSidebar} className="md:hidden text-gray-700 bg-white p-2 rounded shadow">
+          ☰
+        </button>
+        <div className="flex-grow flex items-center">
+          <span className="text-lg md:text-[30px] font-semibold">Welcome, {user?.name || ""}</span>
+        </div>
       </div>
 
       {/* Notifications and Profile */}

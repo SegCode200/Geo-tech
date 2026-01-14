@@ -1,102 +1,201 @@
-import { useState, useEffect } from "react";
-import { FaFileAlt, FaCheckCircle, FaClock, FaTimesCircle, FaUpload, FaClipboardList, FaBell } from "react-icons/fa";
+
 import { motion } from "framer-motion";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  FaFileAlt,
+  FaCheckCircle,
+  FaClock,
+  FaTimesCircle,
+  FaLandmark,
+  FaMoneyBillWave,
+} from "react-icons/fa";
+import dayjs from "dayjs";
+import { useAppSelector } from "../../store/hooks";
+import { useDashboardOverview } from "../../hooks/useHooks";
 
-const Dashboard = () => {
-  const [userName, setUserName] = useState("John Doe");
-  const [notifications, setNotifications] = useState([
-    { id: 1, message: "Your C of O application is under review.", type: "info" },
-    { id: 2, message: "New document required for verification.", type: "warning" },
-    { id: 3, message: "Your application was approved!", type: "success" },
-  ]);
+const StatCard = ({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  color: string;
+}) => (
+  <motion.div
+    whileHover={{ scale: 1.03 }}
+    className="bg-white rounded-xl shadow-md p-5 flex items-center gap-4"
+  >
+    <div className={`text-3xl ${color}`}>{icon}</div>
+    <div>
+      <p className="text-gray-500 text-sm">{label}</p>
+      <p className="text-2xl font-bold text-gray-900">{value}</p>
+    </div>
+  </motion.div>
+);
 
-  // Sample Chart Data
-  const data = [
-    { month: "Jan", approved: 10, rejected: 2 },
-    { month: "Feb", approved: 15, rejected: 5 },
-    { month: "Mar", approved: 20, rejected: 3 },
-    { month: "Apr", approved: 18, rejected: 4 },
-  ];
-
-  useEffect(() => {
-    // Fetch user data here if needed
-  }, []);
+const StatusBadge = ({ status }: { status: string }) => {
+  const map: Record<string, string> = {
+    APPROVED: "bg-green-100 text-green-700",
+    PENDING: "bg-yellow-100 text-yellow-700",
+    REJECTED: "bg-red-100 text-red-700",
+    PAID: "bg-green-100 text-green-700",
+    UNPAID: "bg-gray-100 text-gray-700",
+    FAILED: "bg-red-100 text-red-700",
+  };
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      {/* Welcome Section */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        className="bg-blue-600 text-white p-6 rounded-lg shadow-md mb-6"
-      >
-        <h1 className="text-2xl font-bold">Welcome, {userName}!</h1>
-        <p className="text-gray-200">Here’s what’s happening with your applications.</p>
-      </motion.div>
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+        map[status] || "bg-gray-100 text-gray-700"
+      }`}
+    >
+      {status}
+    </span>
+  );
+};
 
-      {/* Notifications */}
-      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <FaBell className="text-yellow-500" /> Notifications
+const Dashboard = () => {
+  const { user } = useAppSelector((s) => s.auth);
+
+  const { data, error, isLoading } = useDashboardOverview()
+
+  if (isLoading) {
+    return <div className="p-6">Loading dashboard…</div>;
+  }
+
+  if (error || !data) {
+    return (
+      <div className="p-6 text-red-600">
+        Failed to load dashboard data
+      </div>
+    );
+  }
+
+  const { stats, recentApplications, recentPayments } = data;
+
+  return (
+    <div className="p-4 sm:p-6 bg-gray-100 min-h-screen">
+      {/* Welcome */}
+      <div className="bg-blue-700 text-white rounded-xl p-6 mb-6 shadow">
+        <h1 className="text-2xl font-bold">
+          Welcome, {user?.name ?? "Citizen"}
+        </h1>
+        <p className="text-blue-100">
+          Certificate of Occupancy Dashboard Overview
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <StatCard
+          label="Registered Lands"
+          value={stats.totalLands}
+          icon={<FaLandmark />}
+          color="text-blue-600"
+        />
+        <StatCard
+          label="Total Applications"
+          value={stats.totalApplications}
+          icon={<FaFileAlt />}
+          color="text-indigo-600"
+        />
+        <StatCard
+          label="Approved"
+          value={stats.approvedCofO}
+          icon={<FaCheckCircle />}
+          color="text-green-600"
+        />
+        <StatCard
+          label="Pending"
+          value={stats.pendingCofO}
+          icon={<FaClock />}
+          color="text-yellow-600"
+        />
+        <StatCard
+          label="Rejected"
+          value={stats.rejectedCofO}
+          icon={<FaTimesCircle />}
+          color="text-red-600"
+        />
+      </div>
+
+      {/* Recent Applications */}
+      <div className="bg-white rounded-xl shadow p-5 mb-8">
+        <h2 className="text-lg font-bold mb-4">
+          Recent C of O Applications
         </h2>
-        <ul className="space-y-3">
-          {notifications.map((notif) => (
-            <li key={notif.id} className={`p-3 rounded-md ${notif.type === "success" ? "bg-green-100" : notif.type === "warning" ? "bg-yellow-100" : "bg-blue-100"}`}>
-              <p className="text-gray-700">{notif.message}</p>
-            </li>
-          ))}
-        </ul>
+
+        {recentApplications.length === 0 ? (
+          <p className="text-gray-500">No applications yet</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b">
+                  <th className="py-2">Status</th>
+                  <th>Payment</th>
+                  <th>Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentApplications.map((app) => (
+                  <tr key={app.id} className="border-b last:border-none">
+                    <td className="py-3">
+                      <StatusBadge status={app.status} />
+                    </td>
+                    <td>
+                      <StatusBadge status={app.paymentStatus} />
+                    </td>
+                    <td className="text-gray-600">
+                      {dayjs(app.submittedAt).format("DD MMM YYYY")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Statistics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        {[
-          { label: "Approved", value: 15, icon: <FaCheckCircle className="text-green-500 text-4xl" /> },
-          { label: "Pending", value: 7, icon: <FaClock className="text-yellow-500 text-4xl" /> },
-          { label: "Rejected", value: 3, icon: <FaTimesCircle className="text-red-500 text-4xl" /> },
-        ].map((item, index) => (
-          <motion.div 
-            key={index} 
-            whileHover={{ scale: 1.05 }} 
-            className="bg-white p-6 rounded-lg shadow-md text-center flex flex-col items-center"
-          >
-            {item.icon}
-            <p className="text-3xl font-bold mt-2">{item.value}</p>
-            <p className="text-gray-600">{item.label}</p>
-          </motion.div>
-        ))}
-      </div>
+      {/* Recent Payments */}
+      <div className="bg-white rounded-xl shadow p-5">
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <FaMoneyBillWave className="text-green-600" />
+          Recent Payments
+        </h2>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        {[
-          { label: "Apply for C of O", icon: <FaFileAlt />, color: "bg-green-500 hover:bg-green-600" },
-          { label: "Upload Documents", icon: <FaUpload />, color: "bg-yellow-500 hover:bg-yellow-600" },
-          { label: "Check Status", icon: <FaClipboardList />, color: "bg-blue-500 hover:bg-blue-600" },
-        ].map((action, index) => (
-          <button 
-            key={index} 
-            className={`text-white p-4 rounded-lg shadow-md flex items-center justify-center gap-3 ${action.color}`}
-          >
-            {action.icon} {action.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Charts */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4">Application Trends</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="month" />
-            <YAxis />
-            <Tooltip />
-            <Line type="monotone" dataKey="approved" stroke="#4CAF50" strokeWidth={3} />
-            <Line type="monotone" dataKey="rejected" stroke="#F44336" strokeWidth={3} />
-          </LineChart>
-        </ResponsiveContainer>
+        {recentPayments.length === 0 ? (
+          <p className="text-gray-500">No payments yet</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b">
+                  <th className="py-2">Reference</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentPayments.map((p) => (
+                  <tr key={p.reference} className="border-b last:border-none">
+                    <td className="py-3 font-mono">{p.reference}</td>
+                    <td>₦{p.amount.toLocaleString()}</td>
+                    <td>
+                      <StatusBadge status={p.status} />
+                    </td>
+                    <td className="text-gray-600">
+                      {dayjs(p.date).format("DD MMM YYYY")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

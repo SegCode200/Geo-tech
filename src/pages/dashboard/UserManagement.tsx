@@ -26,7 +26,7 @@ const UserManagement = () => {
   };
 
   return (
-    <div className="container mx-auto px-6 py-8">
+    <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
       {/* Breadcrumbs */}
       <nav aria-label="Breadcrumb">
         <ol className="list-none p-0 flex items-center">
@@ -39,8 +39,8 @@ const UserManagement = () => {
       </nav>
 
       {/* Title */}
-      <h1 className="text-2xl font-bold mb-4">User Management</h1>
-      <p className="text-gray-600 mb-6">Create and manage external/internal user accounts.</p>
+      <h1 className="text-2xl sm:text-3xl font-bold mb-2 sm:mb-4">User Management</h1>
+      <p className="text-gray-600 text-sm sm:text-base mb-6">Create and manage external/internal user accounts.</p>
 
       {/* User Type Selection */}
       <div className="mb-6">

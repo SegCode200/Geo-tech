@@ -16,7 +16,7 @@ const COFApplicationList = () => {
       
       {/* Apply for New C of O */}
       <button
-        onClick={() => navigate("/c-of-o-application")}
+        onClick={() => navigate("/dashboard/c-of-o-application")}
         className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-300"
       >
         + Apply for C of O

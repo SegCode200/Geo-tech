@@ -1,134 +1,198 @@
-import React, { useState } from "react";
-import { FaFileUpload } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import {
+  FaMapMarkedAlt,
+  FaUpload,
+  FaMoneyCheckAlt,
+  FaCheckCircle,
+} from "react-icons/fa";
+import SelectLandStep from "./steps/SelectLandStep";
+import UploadDocsStep from "./steps/UploadDocsStep";
+import ReviewAndPayStep from "./steps/ReviewAndPayStep";
+import SuccessStep from "./steps/SuccessStep";
 
+const steps = [
+  { label: "Select Land", icon: FaMapMarkedAlt, description: "Choose your registered land" },
+  { label: "Upload Documents", icon: FaUpload, description: "Submit required documents" },
+  { label: "Review & Payment", icon: FaMoneyCheckAlt, description: "Review and complete payment" },
+  { label: "Completed", icon: FaCheckCircle, description: "Application submitted" },
+];
 
-const ApplyCOF = () => {
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    ownerName: "",
-    landId: "",
-    titleType: "",
-    uploadedDocuments: [],
-  });
+interface DocumentFile {
+  id: string;
+  file: File;
+  name: string;
+}
 
-  const [message, setMessage] = useState("");
-
-  const handleChange = (e:any) => {
-    const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
-  };
-
-  const handleFileUpload = (e:any) => {
-    if(e.target.files){
-      const files = Array.from(e.target.files);
-      setFormData((prevData:any) => ({
-        ...prevData,
-        uploadedDocuments: files.map((file:any) => file.name),
-      }));
-    }
-  
-  };
-
-  const handleSubmit = (e:any) => {
-    e.preventDefault();
-
-    // Simulating form validation
-    if (!formData.ownerName || !formData.landId || !formData.titleType) {
-      setMessage("Please fill all required fields.");
-      return;
-    }
-
-    console.log("Application Submitted:", formData);
-    setMessage("Your C of O application has been submitted!");
-    navigate("/cofo-payment", {state:{email:"ajayisegun2003@gmail.com", amount: 50000, applicationId: 1}});
-  };
+const ApplyCofO = () => {
+  const [step, setStep] = useState(0);
+  const [landId, setLandId] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<Record<string, DocumentFile[]>>({});
+  const [reference, setReference] = useState<string | null>(null);
 
   return (
-    <div className="container mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-4">Apply for Certificate of Occupancy (C of O)</h1>
-
-      {message && (
-        <p className="mb-4 text-center text-white p-3 rounded-md bg-blue-500">{message}</p>
-      )}
-
-      <form onSubmit={handleSubmit} className="bg-white shadow-md p-6 rounded-md">
-        {/* Owner Name */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Owner Name</label>
-          <input
-            type="text"
-            name="ownerName"
-            value={formData.ownerName}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter Owner Name"
-            required
-          />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-10 px-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header - Government Style */}
+        <div className="mb-12 text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-emerald-600 rounded-lg flex items-center justify-center">
+              <FaMapMarkedAlt className="text-white text-xl" />
+            </div>
+            <h1 className="text-4xl font-bold text-slate-900">
+              Certificate of Occupancy Application
+            </h1>
+          </div>
+          <p className="text-slate-600 max-w-2xl mx-auto text-lg">
+            Follow the steps below to submit your Certificate of Occupancy application
+            through the Federal Land Registry System
+          </p>
         </div>
 
-        {/* Land ID */}
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700">Land ID</label>
-          <input
-            type="text"
-            name="landId"
-            value={formData.landId}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter Land ID"
-            required
-          />
+        {/* Modern Stepper */}
+        <div className="mb-12">
+          <div className="relative">
+            {/* Progress Bar */}
+            <div className="absolute top-6 left-0 right-0 h-1 bg-slate-200">
+              <div
+                className="h-full bg-emerald-600 transition-all duration-300"
+                style={{ width: `${(step / (steps.length - 1)) * 100}%` }}
+              ></div>
+            </div>
+
+            {/* Steps */}
+            <div className="relative z-10 flex justify-between">
+              {steps.map((s, i) => {
+                const Icon = s.icon;
+                const active = i <= step;
+                const isCurrentStep = i === step;
+
+                return (
+                  <div key={i} className="flex flex-col items-center flex-1">
+                    <button
+                      onClick={() => i < step && setStep(i)}
+                      disabled={i > step}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 transition-all transform ${
+                        isCurrentStep
+                          ? "ring-4 ring-emerald-200 scale-110 bg-emerald-600 text-white shadow-lg"
+                          : active
+                          ? "bg-emerald-100 text-emerald-700 cursor-pointer hover:scale-105"
+                          : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      }`}
+                    >
+                      <Icon size={20} />
+                    </button>
+                    <div className="text-center">
+                      <p
+                        className={`text-sm font-semibold ${
+                          isCurrentStep
+                            ? "text-emerald-700"
+                            : active
+                            ? "text-slate-700"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        {s.label}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1 hidden md:block">
+                        {s.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Title Type */}
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700">Title Type</label>
-          <select
-            name="titleType"
-            value={formData.titleType}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select Title Type</option>
-            <option value="c-of-o">C of O</option>
-            <option value="right-of-occupancy">Right of Occupancy</option>
-            <option value="governors-consent">Governor's Consent</option>
-          </select>
+        {/* Main Content Card - Government Standard */}
+        <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8 md:p-12">
+          {step === 0 && (
+            <SelectLandStep
+              onNext={(id) => {
+                setLandId(id);
+                setStep(1);
+              }}
+            />
+          )}
+
+          {step === 1 && (
+            <UploadDocsStep
+              onBack={() => setStep(0)}
+              onNext={(files: Record<string, DocumentFile[]>) => {
+                setDocuments(files);
+                setStep(2);
+              }}
+            />
+          )}
+
+          {step === 2 && landId && (
+            <ReviewAndPayStep
+              landId={landId}
+              documents={documents}
+              onBack={() => setStep(1)}
+              onSuccess={(ref: any) => {
+                setReference(ref);
+                setStep(3);
+              }}
+            />
+          )}
+
+          {step === 3 && reference && <SuccessStep reference={reference} />}
         </div>
 
-        {/* File Upload */}
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700">Upload Documents</label>
-          <input type="file" multiple onChange={handleFileUpload} className="border border-gray-300 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-blue-500" />
-        </div>
-        <div className="mt-8">
-                <div className="flex items-center space-x-4">
-                {formData.uploadedDocuments.map((file, index) => (
-                // <li key={index}>{file}</li>
+        {/* Footer Info */}
+        <div className="mt-12 grid md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <FaCheckCircle className="text-blue-600" />
+              </div>
               <div>
-                  <div className="w-24 h-24 border-dashed border-2 border-gray-300 rounded-md flex items-center justify-center cursor-pointer" key={index}>
-                <FaFileUpload className="h-6 w-6 text-gray-500" />
+                <h3 className="font-semibold text-slate-900 mb-1">
+                  Processing Fee
+                </h3>
+                <p className="text-sm text-slate-600">
+                  ₦5,000 one-time payment
+                </p>
               </div>
-                <p className="text-sm text-gray-500">{file}</p>
-              </div>
-              ))}
-                </div>
-                <p className="text-sm text-gray-500 mt-2">Formats: pdf, png, jpg</p>
-              </div>
+            </div>
+          </div>
 
-        <button
-          type="submit"
-          className="mt-6 bg-primary text-white px-4 py-2 rounded-md w-full hover:bg-blue-400 transition duration-300"
-        >
-          Submit Application
-        </button>
-      </form>
+          <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                <FaUpload className="text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 mb-1">
+                  Document Requirements
+                </h3>
+                <p className="text-sm text-slate-600">
+                  7 required documents needed
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                <FaMoneyCheckAlt className="text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 mb-1">
+                  Secure Payment
+                </h3>
+                <p className="text-sm text-slate-600">
+                  Powered by Paystack
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
-export default ApplyCOF;
+export default ApplyCofO;

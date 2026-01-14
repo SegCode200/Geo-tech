@@ -21,7 +21,7 @@ const COFOPayment = () => {
     console.log("Payment Successful", reference);
 
     // Redirect to application list after payment
-    navigate("/c-of-o-list", { state: { message: "Payment successful! Your application is now processing." } });
+    navigate("/dashboard/c-of-o-list", { state: { message: "Payment successful! Your application is now processing." } });
   };
 
   const onClose = () => {

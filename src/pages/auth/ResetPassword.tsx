@@ -1,39 +1,54 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
+  FaLock,
+  FaCheckCircle,
+  FaSpinner,
   FaEye,
   FaEyeSlash,
-  FaLock,
-  FaEnvelope,
-  FaCheckCircle,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-import { useAppDispatch } from "../../store/hooks";
-import { loginUser } from "../../store/authSlice";
-import { FaSpinner } from "react-icons/fa";
+import * as authApi from "../../api/auth";
 import { successToast, errorToast } from "../../utils/toast";
-import { getApiErrorMessage } from "../../utils/apiError";
 
-const Login = () => {
+const ResetPassword = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
+
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const dispatch = useAppDispatch();
+  const [tokenValid, setTokenValid] = useState(true);
+
+  useEffect(() => {
+    if (!token) {
+      setTokenValid(false);
+      setError("Invalid or missing reset token. Please request a new reset link.");
+    }
+  }, [token]);
 
   const schema = yup
     .object({
-      email: yup.string().required("Email is required").email("Invalid email"),
-      password: yup
+      newPassword: yup
         .string()
         .required("Password is required")
-        .min(8, "Minimum 8 characters"),
-      rememberMe: yup.boolean().optional().default(false),
+        .min(8, "Password must be at least 8 characters")
+        .matches(
+          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+          "Password must contain uppercase, lowercase, and numbers"
+        ),
+      confirmPassword: yup
+        .string()
+        .oneOf([yup.ref("newPassword")], "Passwords must match")
+        .required("Please confirm password"),
     })
     .required();
 
@@ -45,31 +60,66 @@ const Login = () => {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: yupResolver(schema),
-    defaultValues: { email: "", password: "", rememberMe: false },
+    defaultValues: { newPassword: "", confirmPassword: "" },
   });
 
   const onSubmit = async (data: FormValues) => {
-    if (loading || submitted) return;
+    if (loading || submitted || !token) return;
     setError(null);
-    setSubmitted(true);
     setLoading(true);
+    setSubmitted(true);
     try {
-       await dispatch(
-        loginUser({ email: data.email, password: data.password })
-      ).unwrap();
-      // console.log(result)
-      successToast("Login successful!");
-      navigate("/dashboard");
+      await authApi.resetPassword(token, data.newPassword);
+      successToast(
+        "Password reset successfully! You can now sign in with your new password."
+      );
+      setTimeout(() => navigate("/auth/login"), 2000);
     } catch (err: any) {
-      // err is a string from the thunk's rejectValue
-      const message = typeof err === "string" ? err : getApiErrorMessage(err);
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to reset password. Please try again.";
       errorToast(message);
       setError(message);
-    } finally {
       setSubmitted(false);
+    } finally {
       setLoading(false);
     }
   };
+
+  if (!tokenValid) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 flex items-center justify-center p-4 sm:p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <div className="bg-white rounded-xl shadow-2xl p-8 text-center">
+            <div className="mb-4 flex justify-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <FaExclamationTriangle className="text-3xl text-red-600" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 mb-4">
+              Invalid Reset Link
+            </h1>
+            <p className="text-slate-600 mb-6">
+              This password reset link is invalid or has expired. Please request
+              a new reset link to continue.
+            </p>
+            <button
+              onClick={() => navigate("/auth/forgot-password")}
+              className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 hover:shadow-lg"
+            >
+              Request New Reset Link
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 flex items-center justify-center p-4 sm:p-8">
@@ -93,13 +143,10 @@ const Login = () => {
                   <FaLock className="text-3xl text-emerald-50" />
                 </div>
               </motion.div>
-              <h1 className="text-4xl font-bold mb-4">
-                Certificate of Occupancy Portal
-              </h1>
+              <h1 className="text-4xl font-bold mb-4">Create a New Password</h1>
               <p className="text-emerald-50 text-lg leading-relaxed mb-8">
-                Secure access to manage your property registrations and
-                Certificate of Occupancy applications. Sign in with your
-                government-verified account.
+                Choose a strong password to secure your GeoTech account. Make
+                sure it's unique and different from your previous password.
               </p>
             </div>
 
@@ -108,25 +155,25 @@ const Login = () => {
               <div className="flex items-center gap-3">
                 <FaCheckCircle className="text-emerald-200 flex-shrink-0" />
                 <span className="text-sm text-emerald-50">
-                  End-to-end encrypted connections
+                  Use a strong, unique password
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <FaCheckCircle className="text-emerald-200 flex-shrink-0" />
                 <span className="text-sm text-emerald-50">
-                  Government-grade security standards
+                  Must contain uppercase, lowercase, and numbers
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <FaCheckCircle className="text-emerald-200 flex-shrink-0" />
                 <span className="text-sm text-emerald-50">
-                  Your data is protected and secure
+                  Your account will be immediately secured
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Right Side - Login Form */}
+          {/* Right Side - Reset Password Form */}
           <div className="p-6 sm:p-8 lg:p-12 flex flex-col justify-center bg-white">
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -135,73 +182,40 @@ const Login = () => {
             >
               <div className="mb-8">
                 <h2 className="text-sm font-semibold text-emerald-600 uppercase tracking-wide mb-2">
-                  Welcome Back
+                  Create New Password
                 </h2>
                 <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
-                  Sign In
+                  Reset Password
                 </h1>
                 <p className="text-slate-600">
-                  Access your C of O account and manage your property
-                  registrations
+                  Enter a strong password to secure your account
                 </p>
               </div>
 
-              {/* Email Field */}
+              {/* New Password Field */}
               <div className="mb-6">
                 <label
-                  htmlFor="email"
+                  htmlFor="newPassword"
                   className="block text-sm font-semibold text-slate-700 mb-2"
                 >
-                  Email Address
+                  New Password
                 </label>
                 <div
                   className={`relative flex items-center transition-all duration-300 ${
-                    focusedField === "email"
-                      ? "ring-2 ring-emerald-500 rounded-lg"
-                      : "border border-slate-300 rounded-lg"
-                  }`}
-                >
-                  <FaEnvelope className="absolute left-4 text-slate-400" />
-                  <input
-                    {...register("email")}
-                    id="email"
-                    onFocus={() => setFocusedField("email")}
-                    onBlur={() => setFocusedField(null)}
-                    className="w-full pl-12 pr-4 py-3 bg-transparent text-slate-900 placeholder-slate-400 focus:outline-none"
-                    placeholder="your.email@example.com"
-                  />
-                </div>
-                {errors.email && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Password Field */}
-              <div className="mb-6">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-semibold text-slate-700 mb-2"
-                >
-                  Password
-                </label>
-                <div
-                  className={`relative flex items-center transition-all duration-300 ${
-                    focusedField === "password"
+                    focusedField === "newPassword"
                       ? "ring-2 ring-emerald-500 rounded-lg"
                       : "border border-slate-300 rounded-lg"
                   }`}
                 >
                   <FaLock className="absolute left-4 text-slate-400" />
                   <input
-                    {...register("password")}
+                    {...register("newPassword")}
                     type={showPassword ? "text" : "password"}
-                    id="password"
-                    onFocus={() => setFocusedField("password")}
+                    id="newPassword"
+                    onFocus={() => setFocusedField("newPassword")}
                     onBlur={() => setFocusedField(null)}
                     className="w-full pl-12 pr-12 py-3 bg-transparent text-slate-900 placeholder-slate-400 focus:outline-none"
-                    placeholder="Enter your password"
+                    placeholder="Enter new password"
                   />
                   <button
                     type="button"
@@ -211,34 +225,59 @@ const Login = () => {
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
-                {errors.password && (
+                {errors.newPassword && (
                   <p className="text-xs text-red-600 mt-1">
-                    {errors.password.message}
+                    {errors.newPassword.message}
+                  </p>
+                )}
+                <p className="text-xs text-slate-500 mt-2">
+                  At least 8 characters with uppercase, lowercase, and numbers
+                </p>
+              </div>
+
+              {/* Confirm Password Field */}
+              <div className="mb-6">
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-sm font-semibold text-slate-700 mb-2"
+                >
+                  Confirm Password
+                </label>
+                <div
+                  className={`relative flex items-center transition-all duration-300 ${
+                    focusedField === "confirmPassword"
+                      ? "ring-2 ring-emerald-500 rounded-lg"
+                      : "border border-slate-300 rounded-lg"
+                  }`}
+                >
+                  <FaLock className="absolute left-4 text-slate-400" />
+                  <input
+                    {...register("confirmPassword")}
+                    type={showConfirmPassword ? "text" : "password"}
+                    id="confirmPassword"
+                    onFocus={() => setFocusedField("confirmPassword")}
+                    onBlur={() => setFocusedField(null)}
+                    className="w-full pl-12 pr-12 py-3 bg-transparent text-slate-900 placeholder-slate-400 focus:outline-none"
+                    placeholder="Confirm password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }
+                    className="absolute right-4 text-slate-400 hover:text-slate-600 transition"
+                  >
+                    {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {errors.confirmPassword.message}
                   </p>
                 )}
               </div>
 
-              {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between mb-8">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    {...register("rememberMe")}
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                  />
-                  <span className="text-sm text-slate-700 group-hover:text-slate-900">
-                    Remember me
-                  </span>
-                </label>
-                <a
-                  href="/auth/forgot-password"
-                  className="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition"
-                >
-                  Forgot Password?
-                </a>
-              </div>
-
-              {/* Sign In Button */}
+              {/* Reset Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -250,42 +289,22 @@ const Login = () => {
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
                     <FaSpinner className="animate-spin" />
-                    Signing in…
+                    Resetting password…
                   </span>
                 ) : (
-                  "Sign In Securely"
+                  "Reset Password"
                 )}
               </motion.button>
 
               {error && (
-                <div className="text-sm text-red-600 text-center mt-2">
+                <div className="text-sm text-red-600 text-center mt-2 bg-red-50 p-3 rounded-lg border border-red-200">
                   {error}
                 </div>
               )}
 
-              {/* Divider */}
-              <div className="relative mb-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-slate-500">
-                    Don't have an account?
-                  </span>
-                </div>
-              </div>
-
-              {/* Register Link */}
-              <a
-                href="/auth/register"
-                className="w-full text-center bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold py-3 px-4 rounded-lg transition-colors duration-300"
-              >
-                Create New Account
-              </a>
-
               {/* Help Text */}
               <p className="text-xs text-slate-500 text-center mt-6">
-                By signing in, you agree to our{" "}
+                By resetting your password, you agree to our{" "}
                 <a
                   href="#"
                   className="text-emerald-600 hover:text-emerald-700 font-medium"
@@ -333,4 +352,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default ResetPassword;
