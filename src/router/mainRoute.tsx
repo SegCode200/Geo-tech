@@ -11,7 +11,7 @@ import LandSearch from "../pages/dashboard/LandSearch";
 import OwnerShipTransfer from "../pages/dashboard/OwnerShipTransfer";
 import COFAApplication from "../pages/dashboard/COFAApplication";
 import UserManagement from "../pages/dashboard/UserManagement";
-import COFAList from "../pages/dashboard/ListofCOO";
+import COFAList from "../pages/dashboard/ListOFLands";
 import COFAApplicationEdit from "../pages/dashboard/EditCOfApplication";
 import COFapplicationList from "../pages/dashboard/ListofCOOApplication";
 import AuthPage from "../pages/auth/AuthPage";
@@ -21,6 +21,8 @@ import DirectToMail from "../pages/auth/DirectToMail";
 import ProtectedRoute from "../components/static/ProtectedRoute";
 import ForgotPassword from "../pages/auth/ForgotPassword";
 import ResetPassword from "../pages/auth/ResetPassword";
+import ResubmitCofO from "../pages/dashboard/ResubmitCofO";
+import CofoDetails from "../pages/dashboard/CofoDetails";
 
 const mainRoute = createBrowserRouter([
   {
@@ -84,6 +86,18 @@ const mainRoute = createBrowserRouter([
         path: "user-management",
         element: <UserManagement />,
       },
+      {
+        path: "c-of-o/resubmit/:id",
+        element: <ResubmitCofO />,
+      },
+      {
+        path: "c-of-o/:id",
+        element: <CofoDetails />,
+      },
+      {
+        path: "cofo-details/:id",
+        element: <CofoDetails />,
+      }
     ],
   },
   {

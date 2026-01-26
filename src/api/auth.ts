@@ -1,4 +1,6 @@
 import axios, {AxiosInstance } from "axios";
+import { api } from "./interceptors";
+
 export type RegisterPayload = {
   firstName?: string;
   lastName?: string;
@@ -18,18 +20,7 @@ export type ApiError = {
   errors?: any;
 };
 
-const API_BASE = "https://geo-tech-backend.onrender.com/api";
-
-const api: AxiosInstance = axios.create({
-  baseURL: API_BASE,
-  withCredentials: true
-});
-
-
-export function setAccessToken(token: string | null) {
-  if (token) api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-  else delete api.defaults.headers.common["Authorization"];
-}
+export { setAccessToken } from "./interceptors";
 
 export function normalizeAxiosError(err: any): ApiError {
   if (err?.response?.data) return err.response.data as ApiError;

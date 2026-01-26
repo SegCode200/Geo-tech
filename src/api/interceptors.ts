@@ -1,6 +1,4 @@
 import axios, { AxiosInstance } from "axios";
-import { store } from "../store";
-import { clearAuth } from "../store/authSlice";
 
 const API_BASE = "https://geo-tech-backend.onrender.com/api"; // adjust for prod
 export const api: AxiosInstance = axios.create({
@@ -34,7 +32,7 @@ export const refresh = async () => {
 };
 
 // Interceptor to auto-refresh on 401
-export const setupInterceptors = () => {
+export const setupInterceptors = (onUnauthorized?: () => void) => {
   api.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -61,7 +59,8 @@ export const setupInterceptors = () => {
           return api(originalRequest);
         } catch (err) {
           processQueue(err, undefined);
-          store.dispatch(clearAuth());
+          // Call the callback instead of directly importing store
+          if (onUnauthorized) onUnauthorized();
           window.location.href = "/auth/login";
           return Promise.reject(err);
         } finally {

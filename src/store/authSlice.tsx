@@ -71,6 +71,9 @@ const authSlice = createSlice({
       state.status = "unauthenticated";
       state.error = null;
     },
+    setAccessToken(state, action) {
+      state.accessToken = action.payload;
+    },
   },
   extraReducers(builder) {
     builder
@@ -82,7 +85,6 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (s, action) => {
         s.user = action.payload.user;
         s.accessToken = action.payload.accessToken ?? null;
-        if (action.payload.accessToken) authApi.setAccessToken(action.payload.accessToken);
         s.status = "authenticated";
       })
       .addCase(loginUser.rejected, (s, action) => {
@@ -93,7 +95,6 @@ const authSlice = createSlice({
       // REFRESH
       .addCase(refreshAccessToken.fulfilled, (s, action) => {
         s.accessToken = action.payload.accessToken;
-        if (action.payload.accessToken) authApi.setAccessToken(action.payload.accessToken);
         s.status = "authenticated";
       })
       .addCase(refreshAccessToken.rejected, (s) => {
@@ -103,5 +104,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearAuth } = authSlice.actions;
+export const { clearAuth, setAccessToken } = authSlice.actions;
 export default authSlice.reducer;

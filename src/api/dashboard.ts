@@ -12,14 +12,15 @@ export type DashboardOverviewResponse = {
   };
   recentApplications: {
     id: string;
-    status: "APPROVED" | "PENDING" | "REJECTED";
+    applicationNumber: string;
+    status: "APPROVED" | "DRAFT" | "NEEDS_CORRECTION" | "IN_REVIEW" | "RESUBMITTED" | "REJECTED" | "SUBMITTED" ;
     submittedAt: string;
-    paymentStatus: "PAID" | "UNPAID";
+    paymentStatus: "SUCCESS" | "UNPAID";
   }[];
   recentPayments: {
     reference: string;
     amount: number;
-    status: "PAID" | "FAILED" | "PENDING";
+    status: "SUCCESS" | "FAILED" | "PENDING" ;
     date: string;
   }[];
 };export async function fetchDashboardOverview(): Promise<DashboardOverviewResponse> {

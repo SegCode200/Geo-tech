@@ -21,6 +21,7 @@ interface DocumentFile {
   id: string;
   file: File;
   name: string;
+  type:string;
 }
 
 const ApplyCofO = () => {
@@ -137,7 +138,7 @@ const ApplyCofO = () => {
             />
           )}
 
-          {step === 3 && reference && <SuccessStep reference={reference} />}
+          {step === 3 && reference && <SuccessStep reference={reference} amount={5000} />}
         </div>
 
         {/* Footer Info */}

@@ -4,7 +4,9 @@ import { useState } from "react";
 
 const SelectLandStep = ({ onNext }: { onNext: (id: string) => void }) => {
   const { data, error, isLoading } = useGetUserLands();
-  const cofaRecords = data?.lands || [];
+  const allLands = data?.lands || [];
+  // Filter only approved lands
+  const cofaRecords = allLands.filter((land: any) => land.landStatus?.toLowerCase() === "approved");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   if (isLoading)
@@ -22,12 +24,22 @@ const SelectLandStep = ({ onNext }: { onNext: (id: string) => void }) => {
       </div>
     );
 
-  if (cofaRecords.length === 0)
+  if (allLands.length === 0)
     return (
       <div className="text-center py-12">
         <FaMapMarkedAlt className="text-6xl text-slate-300 mx-auto mb-4" />
         <p className="text-slate-600">
           You have no registered lands yet. Register a land first.
+        </p>
+      </div>
+    );
+
+  if (cofaRecords.length === 0)
+    return (
+      <div className="text-center py-12">
+        <FaMapMarkedAlt className="text-6xl text-slate-300 mx-auto mb-4" />
+        <p className="text-slate-600">
+          You have no approved lands yet. Your registered lands are still pending approval or have been rejected.
         </p>
       </div>
     );
@@ -39,7 +51,7 @@ const SelectLandStep = ({ onNext }: { onNext: (id: string) => void }) => {
           Select Your Land
         </h2>
         <p className="text-slate-600">
-          Choose the land for which you want to apply for Certificate of
+          Choose an approved land for which you want to apply for Certificate of
           Occupancy
         </p>
       </div>
@@ -62,32 +74,27 @@ const SelectLandStep = ({ onNext }: { onNext: (id: string) => void }) => {
                   <p className="font-bold text-slate-900">
                     Land ID: {land?.id.slice(0, 8).toUpperCase()}
                   </p>
+                  <span className="ml-auto px-3 py-1 bg-green-500 text-white rounded-full text-xs font-bold">
+                    {land.landStatus}
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <p className="font-semibold text-slate-800">{land.ownerName}</p>
+                <div>
+                  <p className="text-slate-500 text-xs font-medium">
+                    LAND SIZE
+                  </p>
+                  <p className="font-semibold text-slate-800">
+                    {land.squareMeters} sqm
+                  </p>
+                </div>
+                {land.location && (
                   <div>
                     <p className="text-slate-500 text-xs font-medium">
-                      OWNER NAME
+                      LOCATION
                     </p>
-                    <p className="font-semibold text-slate-800">{land.ownerName}</p>
+                    <p className="text-slate-700">{land.location}</p>
                   </div>
-                  <div>
-                    <p className="text-slate-500 text-xs font-medium">
-                      LAND SIZE
-                    </p>
-                    <p className="font-semibold text-slate-800">
-                      {land.squareMeters} sqm
-                    </p>
-                  </div>
-                  {land.location && (
-                    <div className="col-span-2">
-                      <p className="text-slate-500 text-xs font-medium">
-                        LOCATION
-                      </p>
-                      <p className="text-slate-700">{land.location}</p>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
               {selectedId === land.id && (
@@ -101,6 +108,7 @@ const SelectLandStep = ({ onNext }: { onNext: (id: string) => void }) => {
           </button>
         ))}
       </div>
+    
 
       <div className="mt-10 pt-6 border-t border-slate-200 flex justify-end">
         <button

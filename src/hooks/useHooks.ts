@@ -1,6 +1,7 @@
 import useSWR from 'swr';
 import { fetchDashboardOverview } from '../api/dashboard';
 import { getLandRegistrations, searchLands } from '../api/auth';
+import api from '../api/auth';
 
 
 
@@ -63,3 +64,37 @@ export const useLandSearch = (
     isLoading,
   };
 };
+
+export const useCofoApplications = () => {
+  const fetcher = () => api.get("/cofo/my-cofo-applications").then((res) => res.data);
+  const { data, error, mutate } = useSWR(
+    "/cofo/my-cofo-applications",
+    () => fetcher(),
+    {
+      revalidateOnFocus: false,
+    }
+  );
+  return {
+    data,
+    error,
+    isLoading: !error && !data,
+    refetch: mutate,
+  };
+}
+
+export const useGetoneCofoApplication = (id: string) => {
+  const fetcher = () => api.get(`/cofo/get-applications/${id}`).then((res) => res.data);
+  const { data, error, mutate } = useSWR(
+    id ? `/cofo/get-applications/${id}` : null,
+    () => fetcher(),
+    {
+      revalidateOnFocus: false,
+    }
+  );
+  return {
+    data,
+    error,
+    isLoading: !error && !data,
+    refetch: mutate,
+  };
+}

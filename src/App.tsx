@@ -1,20 +1,24 @@
 import { RouterProvider } from "react-router-dom";
 import mainRoute from "./router/mainRoute";
 import { Toaster } from "react-hot-toast";
-import { Provider } from "react-redux";
+import { Provider,  useSelector } from "react-redux";
 import { store, persistor } from "./store";
 import { PersistGate } from "redux-persist/integration/react";
 import { useEffect } from "react";
-import { setupInterceptors, setAccessToken } from "./api/interceptors";
+import { setAccessToken as setApiToken } from "./api/interceptors";
+// import { setAccessToken } from "./store/authSlice";
 import AuthBootstrap from "./AuthBootstrap";
+import { RootState } from "./store";
 
 function App() {
   function AppInner() {
+    // const dispatch = useDispatch();
+    const token = useSelector((state: RootState) => state.auth.accessToken);
+
     useEffect(() => {
-      setupInterceptors();
-      const token = store.getState().auth.accessToken;
-      if (token) setAccessToken(token);
-    }, []);
+      // Set token in API when it changes
+      if (token) setApiToken(token);
+    }, [token]);
 
     return (
       <PersistGate loading={null} persistor={persistor}>

@@ -17,6 +17,7 @@ interface DocumentFile {
   id: string;
   file: File;
   name: string;
+  type: string;
 }
 
 const UploadDocsStep = ({ onBack, onNext }: any) => {
@@ -31,6 +32,7 @@ const UploadDocsStep = ({ onBack, onNext }: any) => {
         id: `${Date.now()}-${Math.random()}`,
         file,
         name: file.name,
+        type: file.type,
       }));
       return { ...prev, [key]: [...existing, ...newDocs] };
     });

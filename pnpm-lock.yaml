@@ -11,6 +11,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@18.3.1))
+      '@paystack/inline-js':
+        specifier: ^2.22.7
+        version: 2.22.7
       '@reduxjs/toolkit':
         specifier: ^2.11.2
         version: 2.11.2(react-redux@9.2.0(@types/react@18.3.27)(react@18.3.1)(redux@5.0.1))(react@18.3.1)
@@ -63,6 +66,9 @@ importers:
       '@eslint/js':
         specifier: ^9.21.0
         version: 9.39.2
+      '@types/paystack__inline-js':
+        specifier: ^1.0.2
+        version: 1.0.2
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.27
@@ -647,6 +653,9 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
+
+  '@types/paystack__inline-js@1.0.2':
+    resolution: {integrity: sha512-i7osAkFs+M9iOKLfzhpAMkOxgP0HZd+On4e5VOyvbetuzhWPXhCycYrC5j6IHtMfzXT+Av8tNVaRDQLE3N1Jfw==}
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
@@ -2267,6 +2276,8 @@ snapshots:
       hoist-non-react-statics: 3.3.2
 
   '@types/json-schema@7.0.15': {}
+
+  '@types/paystack__inline-js@1.0.2': {}
 
   '@types/prop-types@15.7.15': {}
 

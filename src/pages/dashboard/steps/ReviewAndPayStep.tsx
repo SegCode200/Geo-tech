@@ -7,6 +7,8 @@ import {
   FaCheckCircle,
   FaSpinner,
 } from "react-icons/fa";
+import PaystackPop from "@paystack/inline-js";
+import { errorToast, successToast } from "../../../utils/toast";
 
 const COFO_DOCUMENTS = [
   { key: "SURVEY_PLAN", label: "Survey Plan", required: true },
@@ -24,6 +26,7 @@ interface DocumentFile {
   id: string;
   file: File;
   name: string;
+  type: string;
 }
 
 const ReviewAndPayStep = ({ landId, documents, onBack, onSuccess }: any) => {
@@ -35,55 +38,89 @@ const ReviewAndPayStep = ({ landId, documents, onBack, onSuccess }: any) => {
     setError(null);
     try {
       // Initialize payment
-      const { data } = await api.post("/payments/initialize", { landID: landId, amount: 5000 });
+      const { data } = await api.post("/payments/initialize", {
+        landID: landId,
+        amount: 5000,
+      });
+      console.log("Payment init response:", data);
 
-      const handler = (window as any).PaystackPop.setup({
-        key: data.publicKey,
-        email: data.email,
+      // Initialize Paystack
+      const paystack = new PaystackPop();
+
+      paystack.newTransaction({
+        key: data.publicKey || "",
+        email: data.email || "",
         amount: data.amount * 100,
-        ref: data.reference,
-        callback: async () => {
+        reference: data.reference,
+        // ref: data.reference,
+        onSuccess: async () => {
           try {
+            console.log("Payment successful, verifying...");
             // Verify payment
-            await api.get(`/payments/verify?reference=${data.reference}`);
+            const verifyResponse = await api.get(
+              `/payments/verify?reference=${data.reference}`,
+            );
+            const verifyData = verifyResponse.data;
 
             // Upload documents
             const form = new FormData();
-            form.append("cofOApplicationId", data.cofOApplicationId);
 
-            Object.entries(documents).forEach(([ fileList]: any) => {
-              if (fileList && fileList.length > 0) {
-                fileList.forEach((doc: DocumentFile) => {
-                  form.append("documents", doc.file);
+            // Prepare documents with type and title
+            const documentsMeta: {
+              type: string;
+              title: string;
+            }[] = [];
+
+            Object.entries(documents).forEach(([docKey, fileList]: any) => {
+              const docConfig = COFO_DOCUMENTS.find((d) => d.key === docKey);
+              const title = docConfig?.label || docKey;
+
+              fileList.forEach((doc: DocumentFile) => {
+                form.append("documents", doc.file); // ✅ files only
+                documentsMeta.push({
+                  type: docKey, // ✅ correct
+                  title: title, // ✅ human readable
                 });
-              }
+              });
             });
 
-            const res = await api.post(`/cofo/apply/${data.cofOApplicationId}`, form, {
-              headers: { "Content-Type": "multipart/form-data" },
-            });
+            // Append each document metadata as separate form fields
+            form.append("documentsMeta", JSON.stringify(documentsMeta));
+
+            const res = await api.post(
+              `/cofo/apply/${verifyData.cofOApplicationId}`,
+              form,
+              {
+                headers: { "Content-Type": "multipart/form-data" },
+              },
+            );
+            successToast("Payment successful and documents uploaded");
             onSuccess(res.data.applicationNumber);
           } catch (err: any) {
+            console.error("Verification error:", err);
+            errorToast("Payment verification failed or document upload error");
             setError(
-              err.response?.data?.message || "Payment verification failed"
+              err.response?.data?.message || "Payment verification failed",
             );
             setLoading(false);
           }
         },
-        onClose: () => {
+        onCancel: () => {
           setLoading(false);
+          errorToast("Payment was cancelled");
         },
       });
-
-      handler.openIframe();
     } catch (err: any) {
+      console.error("Payment error:", err);
+      errorToast("Payment initialization failed");
       setError(err.response?.data?.message || "Payment initialization failed");
       setLoading(false);
     }
   };
 
   const getFileIcon = (fileName: string) => {
-    if (fileName.endsWith(".pdf")) return <FaFilePdf className="text-red-600" />;
+    if (fileName.endsWith(".pdf"))
+      return <FaFilePdf className="text-red-600" />;
     if ([".jpg", ".jpeg", ".png"].some((ext) => fileName.endsWith(ext)))
       return <FaFileImage className="text-blue-600" />;
     return <FaFile className="text-gray-600" />;
@@ -124,7 +161,8 @@ const ReviewAndPayStep = ({ landId, documents, onBack, onSuccess }: any) => {
           </h3>
           <div className="bg-emerald-50 px-4 py-2 rounded-full">
             <p className="text-sm font-semibold text-emerald-700">
-              {countDocuments()} file{countDocuments() !== 1 ? "s" : ""} uploaded
+              {countDocuments()} file{countDocuments() !== 1 ? "s" : ""}{" "}
+              uploaded
             </p>
           </div>
         </div>
@@ -135,7 +173,10 @@ const ReviewAndPayStep = ({ landId, documents, onBack, onSuccess }: any) => {
             const hasFiles = uploadedDocs && uploadedDocs.length > 0;
 
             return (
-              <div key={doc.key} className="border border-slate-200 rounded-lg p-4">
+              <div
+                key={doc.key}
+                className="border border-slate-200 rounded-lg p-4"
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     {hasFiles ? (
@@ -144,7 +185,9 @@ const ReviewAndPayStep = ({ landId, documents, onBack, onSuccess }: any) => {
                       <div className="w-5 h-5 rounded-full border-2 border-slate-300"></div>
                     )}
                     <div>
-                      <p className="font-semibold text-slate-800">{doc.label}</p>
+                      <p className="font-semibold text-slate-800">
+                        {doc.label}
+                      </p>
                       {doc.required && (
                         <p className="text-xs text-slate-500">Required</p>
                       )}
@@ -152,7 +195,8 @@ const ReviewAndPayStep = ({ landId, documents, onBack, onSuccess }: any) => {
                   </div>
                   {hasFiles && (
                     <span className="text-sm font-medium text-slate-600">
-                      {uploadedDocs.length} file{uploadedDocs.length !== 1 ? "s" : ""}
+                      {uploadedDocs.length} file
+                      {uploadedDocs.length !== 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
