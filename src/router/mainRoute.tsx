@@ -1,6 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
 import DashboardLayout from "../components/layouts/DashboardLayout";
-import Profile from "../pages/Profile";
 import Register from "../pages/auth/Register";
 import Login from "../pages/auth/Login";
 import Home from "../pages/HomePage";
@@ -42,10 +41,6 @@ const mainRoute = createBrowserRouter([
       {
         index: true,
         element: <Overview />,
-      },
-      {
-        path: "profile",
-        element: <Profile />,
       },
 
       {

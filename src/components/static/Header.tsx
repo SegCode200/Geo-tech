@@ -7,7 +7,7 @@ type HeaderProps = {
 };
 
 const Header = ({ onToggleSidebar }: HeaderProps) => {
-  const { user } = useAppSelector((s) => s.auth);
+  const { user } = useAppSelector((s: any) => s.auth);
   
   return (
     <header className="py-4 ml-10 px-0 md:px-4 flex justify-between items-center">

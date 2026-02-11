@@ -95,7 +95,7 @@ const ActionCard = ({
 );
 
 const Dashboard = () => {
-  const { user } = useAppSelector((s) => s.auth);
+  const { user } = useAppSelector((s: any) => s.auth);
   const navigate = useNavigate();
 
   const { data, error, isLoading } = useDashboardOverview()

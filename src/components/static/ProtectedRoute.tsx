@@ -6,7 +6,7 @@ import { setAccessToken } from "../../api/auth";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const dispatch = useAppDispatch();
-  const accessToken = useAppSelector((s) => s.auth.accessToken);
+  const accessToken = useAppSelector((s: any) => s.auth.accessToken);
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
 

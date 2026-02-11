@@ -13,7 +13,7 @@ import { RootState } from "./store";
 function App() {
   function AppInner() {
     // const dispatch = useDispatch();
-    const token = useSelector((state: RootState) => state.auth.accessToken);
+    const token = useSelector((state: RootState) => (state as any).auth?.accessToken ?? null);
 
     useEffect(() => {
       // Set token in API when it changes
