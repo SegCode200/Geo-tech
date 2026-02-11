@@ -9,7 +9,6 @@ const DirectToMail = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [email, setEmail] = useState<string>(location.state?.email || '');
-  const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [message, setMessage] = useState<string | null>(null);

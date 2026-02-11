@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "../../api/auth";
 import {
   FaUpload,
@@ -19,6 +20,7 @@ interface RejectedDoc {
   type: string;
   title: string;
   url: string;
+  status: string;
 }
 
 interface FileItem {
@@ -34,28 +36,53 @@ const getFileIcon = (name: string) => {
 };
 
 const ResubmitCofO = ({ cofOId, onSuccess }: any) => {
+  const params = useParams();
+  const navigate = useNavigate();
+  const id = cofOId ?? params.id;
+
   const [loading, setLoading] = useState(false);
   const [rejectedDocs, setRejectedDocs] = useState<RejectedDoc[]>([]);
+  const [allDocs, setAllDocs] = useState<RejectedDoc[]>([]);
   const [files, setFiles] = useState<Record<string, FileItem[]>>({});
 
   // 1️⃣ Fetch rejected docs
   useEffect(() => {
-    api.get(`/cofo/get-applications/${cofOId}`)
+    if (!id) {
+      errorToast("Invalid application selected");
+      navigate("/dashboard/list-c-of-o-application");
+      return;
+    }
+
+    api.get(`/cofo/get-applications/${id}`)
       .then((res) => {
-        const rejected = res.data.cofODocuments.filter(
-          (d: any) => d.status === "REJECTED"
+        // API may return documents under different shapes (res.data.cofODocuments OR res.data.cofO.cofODocuments)
+        const docs: any[] =
+          res.data?.cofODocuments || res.data?.cofO?.cofODocuments || res.data?.cofO || [];
+
+        setAllDocs(docs || []);
+
+
+        // console.log(docs)
+
+        // Prefer docs explicitly rejected, otherwise include any doc that is not approved
+        const rejected = (docs || []).filter(
+          (d: any) => d?.status === "REJECTED" || d?.status === "NEEDS_CORRECTION" || (d?.status && d?.status !== "APPROVED")
         );
+
         setRejectedDocs(rejected);
       })
       .catch(() => {
         errorToast("Failed to load rejected documents");
       });
-  }, [cofOId]);
+  }, [id, navigate]);
 
-  const handleFileChange = (docType: string, fileList: FileList | null) => {
+  console.log("Files", allDocs)
+  console.log("rejected docs",rejectedDocs)
+
+  const handleFileChange = (docId: string, docType: string, fileList: FileList | null) => {
     if (!fileList) return;
     const newFiles = Array.from(fileList).map((f) => ({
-      id: crypto.randomUUID(),
+      id: docId,
       file: f,
     }));
     setFiles((prev) => ({
@@ -76,23 +103,26 @@ const ResubmitCofO = ({ cofOId, onSuccess }: any) => {
     setLoading(true);
     try {
       const form = new FormData();
-      const meta: { type: string; title: string }[] = [];
+      const meta: { type: string; title: string; docId: string }[] = [];
+
+      console.log(meta)
 
       Object.entries(files).forEach(([type, fileList]) => {
         fileList.forEach((f) => {
           form.append("documents", f.file);
-          meta.push({ type, title: type.replace(/_/g, " ") });
+          meta.push({ type, title: type.replace(/_/g, " "), docId: f.id });
         });
       });
 
       form.append("documentsMeta", JSON.stringify(meta));
 
-      await api.post(`/cofo/re-submit/${cofOId}`, form, {
+      await api.post(`/cofo/re-submit/${id}`, form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       successToast("Documents resubmitted successfully");
       onSuccess();
+      navigate("/dashboard/list-c-of-o-application");
     } catch (err: any) {
       errorToast(err.response?.data?.message || "Resubmission failed");
     } finally {
@@ -100,7 +130,10 @@ const ResubmitCofO = ({ cofOId, onSuccess }: any) => {
     }
   };
 
-  if (rejectedDocs.length === 0) {
+  // If no documents were explicitly marked as rejected, fall back to any non-approved docs
+  const docsToResubmit = rejectedDocs.length > 0 ? rejectedDocs : allDocs.filter((d) => d?.status && d.status !== "APPROVED");
+
+  if (docsToResubmit.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -110,11 +143,9 @@ const ResubmitCofO = ({ cofOId, onSuccess }: any) => {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 rounded-full mb-4">
           <FaCheckCircle className="text-3xl text-emerald-600" />
         </div>
-        <h3 className="text-xl font-bold text-emerald-900 mb-2">
-          All Documents Approved
-        </h3>
+        <h3 className="text-xl font-bold text-emerald-900 mb-2">All Documents Approved</h3>
         <p className="text-emerald-700">
-          No rejected documents. Your Certificate of Occupancy application is complete.
+          No documents need resubmission. If you believe this is incorrect, please contact support or check the application details.
         </p>
       </motion.div>
     );
@@ -194,7 +225,7 @@ const ResubmitCofO = ({ cofOId, onSuccess }: any) => {
                   <input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => handleFileChange(doc.type, e.target.files)}
+                    onChange={(e) => handleFileChange(doc.id,doc.type, e.target.files)}
                     className="hidden"
                   />
                 </motion.div>

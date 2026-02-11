@@ -9,12 +9,14 @@ import LandRegistration from "../pages/dashboard/LandRegistration";
 import EditLand from "../pages/dashboard/EditLand";
 import LandSearch from "../pages/dashboard/LandSearch";
 import OwnerShipTransfer from "../pages/dashboard/OwnerShipTransfer";
+import OwnerShipTransferDetails from "../pages/dashboard/OwnerShipTransferDetails";
+import { OwnershipTransferOTPVerification } from "../pages/dashboard/OwnershipTransferOTPVerification";
+import { OwnershipTransferDocuments } from "../pages/dashboard/OwnershipTransferDocuments";
+import { OwnershipTransferProgress } from "../pages/dashboard/OwnershipTransferProgress";
 import COFAApplication from "../pages/dashboard/COFAApplication";
 import UserManagement from "../pages/dashboard/UserManagement";
 import COFAList from "../pages/dashboard/ListOFLands";
-import COFAApplicationEdit from "../pages/dashboard/EditCOfApplication";
 import COFapplicationList from "../pages/dashboard/ListofCOOApplication";
-import AuthPage from "../pages/auth/AuthPage";
 import COFOPayment from "../pages/dashboard/CofOPayment";
 import VerifyEmail from "../pages/auth/VerifyEmail";
 import DirectToMail from "../pages/auth/DirectToMail";
@@ -67,6 +69,22 @@ const mainRoute = createBrowserRouter([
         element: <OwnerShipTransfer />,
       },
       {
+        path: "ownership-transfer/:transferId",
+        element: <OwnerShipTransferDetails />,
+      },
+      {
+        path: "ownership-transfer/:transferId/otp",
+        element: <OwnershipTransferOTPVerification />,
+      },
+      {
+        path: "ownership-transfer/:transferId/documents",
+        element: <OwnershipTransferDocuments />,
+      },
+      {
+        path: "ownership-transfer/:transferId/progress",
+        element: <OwnershipTransferProgress />,
+      },
+      {
         path: "c-of-o-application",
         element: <COFAApplication />,
       },
@@ -77,10 +95,6 @@ const mainRoute = createBrowserRouter([
       {
         path: "cofo-payment",
         element: <COFOPayment />,
-      },
-      {
-        path: "edit-c-of-o-application",
-        element: <COFAApplicationEdit />,
       },
       {
         path: "user-management",
@@ -123,11 +137,7 @@ const mainRoute = createBrowserRouter([
   {
     path: "/auth/check-mail", // Route for the check mail page
     element: <DirectToMail />, // Render the DirectToMail component
-  },
-  {
-    path: "/auth", // Route for auth fallback
-    element: <AuthPage />, // Render the AuthPage component
-  },
+  }
 ]);
 
 export default mainRoute;

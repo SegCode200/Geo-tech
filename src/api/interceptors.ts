@@ -4,7 +4,10 @@ const API_BASE = "https://geo-tech-backend.onrender.com/api"; // adjust for prod
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE,
   withCredentials: true, // sends HttpOnly cookies automatically
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    // Don't set Authorization header here - set it dynamically via setAccessToken
+  },
 });
 
 let isRefreshing = false;
@@ -37,7 +40,13 @@ export const setupInterceptors = (onUnauthorized?: () => void) => {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
-      if (error.response?.status === 401 && !originalRequest._retry) {
+      
+      // Only retry on 401 for non-refresh endpoints to avoid infinite loops
+      if (
+        error.response?.status === 401 &&
+        !originalRequest._retry &&
+        !originalRequest.url?.includes("/auth/refresh-token")
+      ) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
@@ -61,12 +70,18 @@ export const setupInterceptors = (onUnauthorized?: () => void) => {
           processQueue(err, undefined);
           // Call the callback instead of directly importing store
           if (onUnauthorized) onUnauthorized();
-          window.location.href = "/auth/login";
+          // Don't force redirect here - let the app handle logout
           return Promise.reject(err);
         } finally {
           isRefreshing = false;
         }
       }
+      
+      // For refresh-token endpoint returning 401, just reject
+      if (originalRequest.url?.includes("/auth/refresh-token") && error.response?.status === 401) {
+        return Promise.reject(error);
+      }
+      
       return Promise.reject(error);
     }
   );

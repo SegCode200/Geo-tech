@@ -26,6 +26,7 @@ export type DashboardOverviewResponse = {
 };export async function fetchDashboardOverview(): Promise<DashboardOverviewResponse> {
   try {
     const res = await api.get("/user/dashboard-overview");
+    console.log(res.data)
     return res.data;
   } catch (err: any) {
     throw normalizeAxiosError(err);

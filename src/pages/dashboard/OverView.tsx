@@ -157,6 +157,8 @@ const Dashboard = () => {
 
   const { stats, recentApplications, recentPayments } = data;
 
+  console.log(recentApplications)
+
   return (
     <div className="p-4 sm:p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
       {/* Welcome Section */}

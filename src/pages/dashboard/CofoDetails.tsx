@@ -7,7 +7,6 @@ import {
   FaUser,
   FaPhone,
   FaEnvelope,
-  FaBuilding,
   FaCalendar,
   FaCheckCircle,
   FaTimesCircle,
@@ -373,6 +372,41 @@ const CofoDetails = () => {
                 </div>
               </motion.div>
             )}
+            {/* Certificate Section - Only shown when APPROVED */}
+            {application.status === "APPROVED" && application.certificateUrl && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg overflow-hidden border-2 border-green-200"
+              >
+                <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6 text-white">
+                  <h2 className="text-2xl font-bold flex items-center gap-3">
+                    <FaCheckCircle />
+                    Certificate of Ownership
+                  </h2>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="bg-white rounded-lg p-4 border border-green-200">
+                    <p className="text-sm text-slate-600 mb-2">Your Certificate of Ownership is ready!</p>
+                    <p className="text-slate-900 font-semibold mb-4">Certificate Number: {application.cofONumber}</p>
+                    <button
+                      onClick={() => {
+                        const link = document.createElement("a");
+                        link.href = application.certificateUrl;
+                        link.download = `Certificate-${application.applicationNumber}.pdf` || "certificate.pdf";
+                        link.click();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    >
+                      <FaDownload size={16} />
+                      Download Certificate PDF
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {application.cofODocuments && application.cofODocuments.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -389,7 +423,6 @@ const CofoDetails = () => {
                 <div className="p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {application.cofODocuments.map((doc: any) => {
-                      const isImage = doc.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
                       const isPdf = doc.url?.match(/\.pdf$/i);
 
                       return (
@@ -480,9 +513,14 @@ const CofoDetails = () => {
                   </button>
                 )}
 
-                {application.status === "APPROVED" && (
+                {application.status === "APPROVED" && application.certificateUrl && (
                   <button
-                    onClick={() => {/* Download logic */}}
+                    onClick={() => {
+                      const link = document.createElement("a");
+                      link.href = application.certificateUrl;
+                      link.download = `Certificate-${application.applicationNumber}.pdf` || "certificate.pdf";
+                      link.click();
+                    }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
                   >
                     <FaDownload size={16} />

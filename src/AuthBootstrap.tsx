@@ -15,13 +15,19 @@ export default function AuthBootstrap({ children }: { children: ReactNode }) {
       });
 
       try {
-        const res = await api.post("/auth/refresh-token");
-        const token = res.data.accessToken;
+        // Only attempt refresh if user has been logged in before (has a refresh token)
+        // Check if there's a token in Redux state or localStorage (from persistence)
+        const token = localStorage.getItem("auth_token"); // or check Redux state
         if (token) {
-          setApiToken(token);
-          dispatch(setAccessToken(token));
+          const res = await api.post("/auth/refresh-token");
+          const newToken = res.data.accessToken;
+          if (newToken) {
+            setApiToken(newToken);
+            dispatch(setAccessToken(newToken));
+          }
         }
-      } catch {
+      } catch (err) {
+        // Silent fail - user is not logged in, that's okay
         dispatch(clearAuth());
       } finally {
         setLoading(false);

@@ -17,11 +17,10 @@ import {
   FaHome,
   FaGlobe,
   FaFile,
-  FaArrowLeft,
   FaFilter,
-  FaCheckCircle,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
+import ShowMap from "../../components/Map/ShowMap";
 
 const getStatusColor = (status: string) => {
   switch (status?.toLowerCase()) {
@@ -41,6 +40,7 @@ const LandRegistrationList = () => {
   const {data, error, isLoading, refetch} = useGetUserLands()
   const cofaRecords = data?.lands || [];
   const [selectedLand, setSelectedLand] = useState<any | null>(null);
+  const [mapLand, setMapLand] = useState<any | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -281,6 +281,19 @@ const LandRegistrationList = () => {
                     </div>
                   </div>
 
+                  {/* Address */}
+                  {record?.address && (
+                    <div>
+                      <p className="text-xs font-bold text-slate-600 uppercase mb-1 flex items-center gap-1">
+                        <FaMapMarkerAlt className="text-red-600" />
+                        Address
+                      </p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {record.address}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Size and Location */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -318,32 +331,44 @@ const LandRegistrationList = () => {
                 </div>
 
                 {/* Card Actions */}
-                <div className="bg-slate-50 px-6 py-4 flex gap-2 border-t">
+                <div className="bg-slate-50 px-6 py-4 flex gap-2 border-t overflow-x-auto">
                   <button
                     onClick={() => setSelectedLand(record)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium text-sm"
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium text-sm whitespace-nowrap flex-shrink-0"
                     title="View Details"
                   >
                     <FaEye />
-                    View
+                    <span className="hidden sm:inline">View</span>
                   </button>
                   <button
                     onClick={() => navigate(`/dashboard/edit-land/${record.id}`, { state: { land: record } })}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium text-sm"
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium text-sm whitespace-nowrap flex-shrink-0"
                     title="Edit"
                   >
                     <FaEdit />
-                    Edit
+                    <span className="hidden sm:inline">Edit</span>
                   </button>
+
+                  {record?.landStatus?.toLowerCase() === "approved" && record?.latitude && record?.longitude && (
+                    <button
+                      onClick={() => setMapLand(record)}
+                      className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors font-medium text-sm whitespace-nowrap flex-shrink-0"
+                      title="Show on Map"
+                    >
+                      <FaGlobe />
+                      <span className="hidden sm:inline">Show on Map</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setDeleteConfirm(record)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium text-sm"
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium text-sm whitespace-nowrap flex-shrink-0"
                     title="Delete"
                   >
                     <FaTrash />
-                    Delete
+                    <span className="hidden sm:inline">Delete</span>
                   </button>
-                </div>
+                </div> 
               </motion.div>
             ))}
           </motion.div>
@@ -394,6 +419,17 @@ const LandRegistrationList = () => {
                 </div>
               </div>
 
+              {/* Address */}
+              {selectedLand?.address && (
+                <div>
+                  <label className=" text-xs font-bold text-slate-600 uppercase mb-2 flex items-center gap-2">
+                    <FaMapMarkerAlt className="text-red-600" />
+                    Address
+                  </label>
+                  <p className="text-lg font-bold text-slate-900">{selectedLand?.address}</p>
+                </div>
+              )}
+
               {/* Location & Size */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
@@ -438,7 +474,7 @@ const LandRegistrationList = () => {
                         href={doc.documentUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block p-4 bg-slate-50 border border-slate-300 rounded-lg hover:border-cyan-500 hover:bg-cyan-50 transition-all flex items-center justify-between group"
+                        className=" p-4 bg-slate-50 border border-slate-300 rounded-lg hover:border-cyan-500 hover:bg-cyan-50 transition-all flex items-center justify-between group"
                       >
                         <span className="text-slate-900 font-medium truncate flex items-center gap-2">
                           <FaFile className="text-cyan-600 flex-shrink-0" />
@@ -469,6 +505,51 @@ const LandRegistrationList = () => {
               >
                 <FaEdit />
                 Edit Land
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Map Modal */}
+      {mapLand && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setMapLand(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto"
+          >
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 text-white flex items-center justify-between sticky top-0 z-10">
+              <div>
+                <h2 className="text-2xl font-bold">{mapLand?.ownerName || mapLand?.id?.slice(0, 12)}</h2>
+                <p className="text-indigo-100 text-sm mt-1">Size: {mapLand?.squareMeters ? `${mapLand.squareMeters} sqm` : "N/A"}</p>
+              </div>
+              <button
+                onClick={() => setMapLand(null)}
+                className="p-2 hover:bg-indigo-500 rounded-lg transition-colors"
+              >
+                <FaTimes size={24} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <ShowMap lat={mapLand?.latitude} lng={mapLand?.longitude} squareMeters={mapLand?.squareMeters} title={mapLand?.ownerName || mapLand?.id} />
+            </div>
+
+            <div className="sticky bottom-0 bg-slate-50 border-t px-6 py-4 flex gap-3 justify-end">
+              <button
+                onClick={() => setMapLand(null)}
+                className="px-6 py-2 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-bold transition"
+              >
+                Close
               </button>
             </div>
           </motion.div>

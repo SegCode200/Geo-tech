@@ -10,7 +10,7 @@ const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { user } = useAppSelector((s) => s.auth);
   
   return (
-    <header className="py-4 px-0 md:px-4 flex justify-between items-center">
+    <header className="py-4 ml-10 px-0 md:px-4 flex justify-between items-center">
       <div className="flex items-center gap-3">
         <button onClick={onToggleSidebar} className="md:hidden text-gray-700 bg-white p-2 rounded shadow">
           ☰

@@ -1,4 +1,3 @@
-import React from "react";
 import { usePaystackPayment } from "react-paystack";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -7,7 +6,7 @@ const COFOPayment = () => {
   const location = useLocation();
   
   // Get amount & user details from application (passed as state)
-  const { amount, email, applicationId } = location.state || {};
+  const { amount, email } = location.state || {};
 
   // Paystack Configuration
   const config = {
