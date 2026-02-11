@@ -166,7 +166,7 @@ export async function submitTransferDocuments(
     formData.append("documentsMeta", JSON.stringify(data.documentsMeta));
 
     data.files.forEach((file) => {
-      formData.append("files", file);
+      formData.append("documents", file);
     });
 
     const res = await api.post(

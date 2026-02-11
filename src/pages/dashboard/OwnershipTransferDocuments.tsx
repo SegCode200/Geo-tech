@@ -225,22 +225,22 @@ export const OwnershipTransferDocuments = () => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 px-4 md:px-6 lg:px-8 py-6 md:py-8 max-w-4xl mx-auto"
+      className="space-y-3 md:space-y-4 px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-8 max-w-4xl mx-auto"
     >
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-8 text-white shadow-lg"
+        className="bg-gradient-to-r from-green-600 to-green-700 rounded-lg md:rounded-xl p-4 sm:p-6 md:p-8 text-white shadow-lg"
       >
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-            <FaFileUpload className="text-2xl" />
+        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 md:mb-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center flex-shrink-0">
+            <FaFileUpload className="text-lg sm:text-xl md:text-2xl" />
           </div>
-          <h1 className="text-3xl font-bold">Submit Documents</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Submit Documents</h1>
         </div>
-        <p className="text-green-50">
+        <p className="text-xs sm:text-sm md:text-base text-green-50">
           Upload the required documents for the governor to review your ownership transfer request.
         </p>
       </motion.div>
@@ -250,18 +250,18 @@ export const OwnershipTransferDocuments = () => {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`p-4 rounded-lg flex items-center gap-3 border-l-4 ${
+          className={`p-3 sm:p-4 rounded-lg flex items-start sm:items-center gap-2 sm:gap-3 border-l-4 text-xs sm:text-sm md:text-base ${
             messageType === "success"
               ? "bg-green-50 border-green-500 text-green-800"
               : "bg-red-50 border-red-500 text-red-800"
           }`}
         >
           {messageType === "success" ? (
-            <FaCheckCircle className="text-xl flex-shrink-0" />
+            <FaCheckCircle className="text-base sm:text-lg md:text-xl flex-shrink-0 mt-0.5 sm:mt-0" />
           ) : (
-            <FaExclamationCircle className="text-xl flex-shrink-0" />
+            <FaExclamationCircle className="text-base sm:text-lg md:text-xl flex-shrink-0 mt-0.5 sm:mt-0" />
           )}
-          <p className="font-semibold">{message}</p>
+          <p className="font-semibold break-words">{message}</p>
         </motion.div>
       )}
 
@@ -271,13 +271,13 @@ export const OwnershipTransferDocuments = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.15 }}
-          className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500"
+          className="bg-white rounded-lg md:rounded-xl shadow-md p-3 sm:p-4 md:p-6 border-l-4 border-green-500"
         >
-          <h3 className="font-bold text-lg text-gray-900 mb-4">Transfer Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <h3 className="font-bold text-base sm:text-lg md:text-lg text-gray-900 mb-3 sm:mb-4">Transfer Details</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 text-xs sm:text-sm">
             <div>
               <p className="text-gray-600 font-semibold">Land Location</p>
-              <p className="text-gray-900 mt-1">{progress.landDetails.address}</p>
+              <p className="text-gray-900 mt-1 break-words">{progress.landDetails.address}</p>
             </div>
             <div>
               <p className="text-gray-600 font-semibold">Land Size</p>
@@ -287,22 +287,22 @@ export const OwnershipTransferDocuments = () => {
         </motion.div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
         {/* File Upload Area */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500"
+          className="bg-white rounded-lg md:rounded-xl shadow-md p-3 sm:p-4 md:p-6 border-l-4 border-green-500"
         >
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Upload Documents</h2>
+          <h2 className="text-base sm:text-lg md:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Upload Documents</h2>
 
           <div
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer ${
+            className={`border-2 border-dashed rounded-lg md:rounded-xl p-4 sm:p-6 md:p-8 text-center transition-all cursor-pointer ${
               dragActive
                 ? "border-green-500 bg-green-50"
                 : "border-gray-300 bg-gray-50 hover:border-green-400"
@@ -318,14 +318,14 @@ export const OwnershipTransferDocuments = () => {
             />
 
             <label htmlFor="file-input" className="cursor-pointer">
-              <FaFileUpload className="text-4xl text-green-600 mx-auto mb-3" />
-              <p className="text-lg font-semibold text-gray-900 mb-1">
+              <FaFileUpload className="text-2xl sm:text-3xl md:text-4xl text-green-600 mx-auto mb-2 sm:mb-3" />
+              <p className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-1">
                 Drag and drop your files here
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-xs sm:text-sm text-gray-600">
                 or click to browse from your computer
               </p>
-              <p className="text-xs text-gray-500 mt-3">
+              <p className="text-xs text-gray-500 mt-2 sm:mt-3">
                 Accepted: PDF, Word, Images (Max 10MB per file)
               </p>
             </label>
@@ -340,38 +340,38 @@ export const OwnershipTransferDocuments = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ delay: 0.25 }}
-              className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500"
+              className="bg-white rounded-lg md:rounded-xl shadow-md p-3 sm:p-4 md:p-6 border-l-4 border-blue-500"
             >
-              <h2 className="text-lg font-bold text-gray-900 mb-4">
+              <h2 className="text-base sm:text-lg md:text-lg font-bold text-gray-900 mb-3 sm:mb-4">
                 Uploaded Documents ({documents.length})
               </h2>
 
-              <div className="space-y-4">
+              <div className="space-y-2 sm:space-y-3 md:space-y-4">
                 {documents.map((doc, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200"
+                    className="bg-gray-50 rounded-lg md:rounded-xl p-3 sm:p-4 border-2 border-gray-200"
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-2 sm:gap-3 md:gap-4">
                       {/* File Icon */}
-                      <div className="text-3xl flex-shrink-0">
+                      <div className="text-xl sm:text-2xl md:text-3xl flex-shrink-0 mt-0.5 sm:mt-0">
                         {getFileIcon(doc.file)}
                       </div>
 
                       {/* File Info and Inputs */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 text-sm md:text-base truncate">
+                        <p className="font-semibold text-gray-900 text-xs sm:text-sm md:text-base truncate">
                           {doc.file.name}
                         </p>
-                        <p className="text-xs text-gray-600 mt-1">
+                        <p className="text-xs text-gray-600 mt-0.5 sm:mt-1">
                           {(doc.file.size / 1024).toFixed(2)} KB
                         </p>
 
                         {/* Document Type Select */}
-                        <div className="mt-3">
+                        <div className="mt-2 sm:mt-3">
                           <label className="block text-xs font-semibold text-gray-700 mb-1">
                             Document Type <span className="text-red-600">*</span>
                           </label>
@@ -380,7 +380,7 @@ export const OwnershipTransferDocuments = () => {
                             onChange={(e) =>
                               updateDocument(index, { type: e.target.value })
                             }
-                            className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+                            className="w-full px-2 sm:px-3 py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-lg md:rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
                             required
                           >
                             <option value="">Select document type...</option>
@@ -393,7 +393,7 @@ export const OwnershipTransferDocuments = () => {
                         </div>
 
                         {/* Document Title */}
-                        <div className="mt-3">
+                        <div className="mt-2 sm:mt-3">
                           <label className="block text-xs font-semibold text-gray-700 mb-1">
                             Document Title
                           </label>
@@ -404,7 +404,7 @@ export const OwnershipTransferDocuments = () => {
                               updateDocument(index, { title: e.target.value })
                             }
                             placeholder="Enter document title"
-                            className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+                            className="w-full px-2 sm:px-3 py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-lg md:rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
                           />
                         </div>
                       </div>
@@ -413,9 +413,9 @@ export const OwnershipTransferDocuments = () => {
                       <button
                         type="button"
                         onClick={() => removeDocument(index)}
-                        className="text-red-600 hover:text-red-800 flex-shrink-0 mt-2"
+                        className="text-red-600 hover:text-red-800 flex-shrink-0 mt-1 text-base sm:text-lg md:text-xl"
                       >
-                        <FaTimes className="text-xl" />
+                        <FaTimes />
                       </button>
                     </div>
 
@@ -425,12 +425,12 @@ export const OwnershipTransferDocuments = () => {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mt-3"
+                        className="mt-2 sm:mt-3"
                       >
                         <img
                           src={doc.preview}
                           alt="preview"
-                          className="max-h-32 rounded-lg object-cover"
+                          className="max-h-20 sm:max-h-32 rounded-lg md:rounded-xl object-cover"
                         />
                       </motion.div>
                     )}
@@ -447,15 +447,15 @@ export const OwnershipTransferDocuments = () => {
           whileTap={{ scale: 0.98 }}
           type="submit"
           disabled={submitting || documents.length === 0}
-          className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-2 sm:py-3 md:py-4 px-3 sm:px-4 md:px-6 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold rounded-lg md:rounded-xl hover:from-green-700 hover:to-green-800 transition-all shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? (
             <>
-              <FaSpinner className="animate-spin" /> Submitting...
+              <FaSpinner className="animate-spin text-sm sm:text-base md:text-lg" /> Submitting...
             </>
           ) : (
             <>
-              <FaCheckDouble /> Submit Documents
+              <FaCheckDouble className="text-sm sm:text-base md:text-lg" /> Submit Documents
             </>
           )}
         </motion.button>
@@ -466,7 +466,7 @@ export const OwnershipTransferDocuments = () => {
           whileTap={{ scale: 0.98 }}
           type="button"
           onClick={() => navigate(-1)}
-          className="w-full py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-all"
+          className="w-full py-2 sm:py-2 md:py-3 px-3 sm:px-4 md:px-6 bg-gray-200 text-gray-800 font-semibold rounded-lg md:rounded-xl hover:bg-gray-300 transition-all text-sm sm:text-base md:text-lg"
         >
           Go Back
         </motion.button>

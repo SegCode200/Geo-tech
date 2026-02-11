@@ -56,9 +56,9 @@ const OwnershipTransfer = () => {
         getLandsByUser(),
       ]);
 
-      // Use the flat transfers array from the new backend response
-      setApplications(transfersData.transfers || []);
-      setLands(landsData.lands || []);
+      // Support multiple response shapes: either { transfers: [...] } or direct arrays
+      setApplications(transfersData?.transfers || transfersData || []);
+      setLands(landsData?.lands || landsData || []);
     } catch (error: any) {
       console.error("Error loading data:", error);
       errorToast( "Failed to load transfer data");
@@ -197,10 +197,24 @@ const OwnershipTransfer = () => {
 
     try {
       setLoading(true);
+
+      // Merge extraEmail/extraPhone into the arrays if present (and avoid duplicates/primary)
+      const emailsPayload = [...formData.emails];
+      const extraEmail = formData.extraEmail?.trim();
+      if (extraEmail && extraEmail !== formData.newOwnerEmail && !emailsPayload.includes(extraEmail)) {
+        emailsPayload.push(extraEmail);
+      }
+
+      const phonesPayload = [...formData.phones];
+      const extraPhone = formData.extraPhone?.trim();
+      if (extraPhone && extraPhone !== formData.newOwnerPhone && !phonesPayload.includes(extraPhone)) {
+        phonesPayload.push(extraPhone);
+      }
+
       const result = await initiateOwnershipTransfer({
         landId: formData.landId,
-        emails: formData.emails,
-        phones: formData.phones,
+        emails: emailsPayload,
+        phones: phonesPayload,
         newOwnerEmail: formData.newOwnerEmail,
         newOwnerPhone: formData.newOwnerPhone,
       });
@@ -240,22 +254,22 @@ const OwnershipTransfer = () => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 px-4 md:px-6 lg:px-8 py-6 md:py-8"
+      className="space-y-4 md:space-y-6 px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-8 max-w-7xl mx-auto"
     >
       {/* Header Section */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-8 text-white shadow-lg"
+        className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg md:rounded-xl p-4 sm:p-6 md:p-8 text-white shadow-lg"
       >
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-            <FaExchangeAlt className="text-2xl" />
+        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 md:mb-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center flex-shrink-0">
+            <FaExchangeAlt className="text-lg sm:text-xl md:text-2xl" />
           </div>
-          <h1 className="text-3xl font-bold">Ownership Transfer</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold break-words">Ownership Transfer</h1>
         </div>
-        <p className="text-purple-50">
+        <p className="text-xs sm:text-sm md:text-base text-purple-50">
           Transfer land ownership to a new owner. Provide the necessary details and authorization code to proceed.
         </p>
       </motion.div>
@@ -265,18 +279,18 @@ const OwnershipTransfer = () => {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`p-4 rounded-lg flex items-center gap-3 border-l-4 ${
+          className={`p-3 sm:p-4 rounded-lg flex items-start sm:items-center gap-2 sm:gap-3 border-l-4 text-xs sm:text-sm md:text-base ${
             messageType === "success"
               ? "bg-green-50 border-green-500 text-green-800"
               : "bg-red-50 border-red-500 text-red-800"
           }`}
         >
           {messageType === "success" ? (
-            <FaCheckCircle className="text-xl flex-shrink-0" />
+            <FaCheckCircle className="text-lg sm:text-xl flex-shrink-0 mt-0.5 sm:mt-0" />
           ) : (
-            <FaExclamationCircle className="text-xl flex-shrink-0" />
+            <FaExclamationCircle className="text-lg sm:text-xl flex-shrink-0 mt-0.5 sm:mt-0" />
           )}
-          <p className="font-semibold">{message}</p>
+          <p className="font-semibold break-words">{message}</p>
         </motion.div>
       )}
 
@@ -316,7 +330,8 @@ const OwnershipTransfer = () => {
                   <option value="">Choose a land...</option>
                   {lands.map((land) => (
                     <option key={land.id} value={land.id}>
-                      #{(land.id).slice(0,6).toUpperCase() || land.name} ({land.squareMeters}m²)
+                      #{(land.id).slice(0,6).toUpperCase() || land.name} (
+                      {land.squareMeters ?? land.size ?? land.totalSquareMeters ?? land.area ?? "N/A"}m²)
                     </option>
                   ))}
                 </select>
@@ -488,34 +503,33 @@ const OwnershipTransfer = () => {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg md:rounded-xl p-4 md:p-6 border-2 border-purple-200"
+          className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg md:rounded-xl p-3 sm:p-4 md:p-6 border-2 border-purple-200 h-fit sticky top-4"
         >
-          <h3 className="font-bold text-sm md:text-base text-gray-900 mb-4 flex items-center gap-2">
-            <FaExchangeAlt className="text-purple-600 text-base md:text-lg" /> Transfer Information
+          <h3 className="font-bold text-xs sm:text-sm md:text-base text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+            <FaExchangeAlt className="text-purple-600 text-sm sm:text-base md:text-lg flex-shrink-0" /> Transfer Information
           </h3>
-          <div className="space-y-4 text-xs md:text-sm">
-            <div>
-              <p className="font-semibold text-gray-900">Required Fields:</p>
-              <ul className="text-gray-700 mt-2 space-y-1">
+          <div className="space-y-3 sm:space-y-4 text-xs sm:text-sm">\n            <div>
+              <p className="font-semibold text-gray-900 text-xs sm:text-sm">Required Fields:</p>
+              <ul className="text-gray-700 mt-2 space-y-1 text-xs">
                 <li className="flex items-center gap-2">
-                  <FaCheckCircle className="text-green-600 text-xs" /> Select Land
+                  <FaCheckCircle className="text-green-600 text-xs flex-shrink-0" /> Select Land
                 </li>
                 <li className="flex items-center gap-2">
-                  <FaCheckCircle className="text-green-600 text-xs" /> Add Contact Info
+                  <FaCheckCircle className="text-green-600 text-xs flex-shrink-0" /> Add Contact Info
                 </li>
               </ul>
             </div>
-            <div className="pt-4 border-t border-purple-300">
-              <p className="font-semibold text-gray-900">Contact Methods:</p>
-              <ul className="text-gray-700 mt-2 space-y-1">
+            <div className="pt-2 sm:pt-3 md:pt-4 border-t border-purple-300">
+              <p className="font-semibold text-gray-900 text-xs sm:text-sm">Contact Methods:</p>
+              <ul className="text-gray-700 mt-2 space-y-1 text-xs">
                 <li>📧 Email Address</li>
                 <li>📱 Phone Number</li>
                 <li className="text-purple-600 font-semibold">At least one required</li>
               </ul>
             </div>
-            <div className="pt-4 border-t border-purple-300">
-              <p className="font-semibold text-gray-900">Workflow:</p>
-              <ol className="text-gray-700 mt-2 space-y-1 list-decimal list-inside">
+            <div className="pt-2 sm:pt-3 md:pt-4 border-t border-purple-300">
+              <p className="font-semibold text-gray-900 text-xs sm:text-sm">Workflow:</p>
+              <ol className="text-gray-700 mt-2 space-y-1 list-decimal list-inside text-xs">
                 <li>Submit transfer</li>
                 <li>Verify contacts</li>
                 <li>Upload documents</li>
