@@ -21,6 +21,7 @@ import {
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import ShowMap from "../../components/Map/ShowMap";
+import SurveyPlan from "../../components/SurveyPlan";
 
 const getStatusColor = (status: string) => {
   switch (status?.toLowerCase()) {
@@ -41,10 +42,13 @@ const LandRegistrationList = () => {
   const cofaRecords = data?.lands || [];
   const [selectedLand, setSelectedLand] = useState<any | null>(null);
   const [mapLand, setMapLand] = useState<any | null>(null);
+  const [surveyPlanLand, setSurveyPlanLand] = useState<any | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("ALL");
+
+
 
   const handleDeleteLand = async (landId: string) => {
     setDeleting(true);
@@ -54,6 +58,7 @@ const LandRegistrationList = () => {
       setDeleteConfirm(null);
       refetch?.();
     } catch (error: any) {
+      console.log(error)
       const errorMsg = getApiErrorMessage(error);
       errorToast(errorMsg);
     } finally {
@@ -294,27 +299,54 @@ const LandRegistrationList = () => {
                     </div>
                   )}
 
-                  {/* Size and Location */}
+                  {/* Survey Information */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs font-bold text-slate-600 uppercase mb-1 flex items-center gap-1">
-                        <FaRuler className="text-purple-600" />
-                        Size
+                        <FaFile className="text-cyan-600" />
+                        Survey Plan
                       </p>
                       <p className="text-sm font-semibold text-slate-900">
-                        {record?.squareMeters ? `${record.squareMeters} sqm` : "N/A"}
+                        {record?.surveyPlanNumber || "N/A"}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-600 uppercase mb-1 flex items-center gap-1">
-                        <FaMapMarkerAlt className="text-red-600" />
-                        Location
+                        <FaRuler className="text-purple-600" />
+                        Survey Type
                       </p>
-                      <p className="text-xs font-semibold text-slate-900">
-                        Lat: {record?.latitude?.toFixed(4) || "N/A"}
+                      <p className="text-sm font-semibold text-slate-900 capitalize">
+                        {record?.surveyType?.toLowerCase() || "N/A"}
                       </p>
                     </div>
                   </div>
+
+                  {/* Plot Number */}
+                  {record?.plotNumber && (
+                    <div>
+                      <p className="text-xs font-bold text-slate-600 uppercase mb-1">Plot Number</p>
+                      <p className="text-sm font-semibold text-slate-900">{record.plotNumber}</p>
+                    </div>
+                  )}
+
+                  {/* Surveyor Info */}
+                  {record?.surveyorName && (
+                    <div>
+                      <p className="text-xs font-bold text-slate-600 uppercase mb-1">Surveyor</p>
+                      <p className="text-sm font-semibold text-slate-900">{record.surveyorName}</p>
+                      {record.surveyorLicense && (
+                        <p className="text-xs text-slate-600">License: {record.surveyorLicense}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* UTM Zone */}
+                  {record?.utmZone && (
+                    <div>
+                      <p className="text-xs font-bold text-slate-600 uppercase mb-1">UTM Zone</p>
+                      <p className="text-sm font-semibold text-slate-900">{record.utmZone}</p>
+                    </div>
+                  )}
 
                   {/* Divider */}
                   <div className="h-px bg-slate-200"></div>
@@ -341,6 +373,14 @@ const LandRegistrationList = () => {
                     <span className="hidden sm:inline">View</span>
                   </button>
                   <button
+                    onClick={() => setSurveyPlanLand(record)}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium text-sm whitespace-nowrap flex-shrink-0"
+                    title="View Survey Plan"
+                  >
+                    <FaFile />
+                    <span className="hidden sm:inline">Survey Plan</span>
+                  </button>
+                  <button
                     onClick={() => navigate(`/dashboard/edit-land/${record.id}`, { state: { land: record } })}
                     className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium text-sm whitespace-nowrap flex-shrink-0"
                     title="Edit"
@@ -349,7 +389,7 @@ const LandRegistrationList = () => {
                     <span className="hidden sm:inline">Edit</span>
                   </button>
 
-                  {record?.landStatus?.toLowerCase() === "approved" && record?.latitude && record?.longitude && (
+                  {(record?.coordinates || record?.latlngCoordinates || (record?.centerLat && record?.centerLng)) && (
                     <button
                       onClick={() => setMapLand(record)}
                       className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors font-medium text-sm whitespace-nowrap flex-shrink-0"
@@ -434,7 +474,7 @@ const LandRegistrationList = () => {
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Land Size</label>
-                  <p className="text-lg font-bold text-slate-900">{selectedLand?.squareMeters} sqm</p>
+                  <p className="text-lg font-bold text-slate-900">{selectedLand?.areaSqm?.toFixed(2)} sqm</p>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Purpose</label>
@@ -442,17 +482,184 @@ const LandRegistrationList = () => {
                 </div>
               </div>
 
-              {/* Coordinates */}
+              {/* Center Coordinates */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Latitude</label>
-                  <p className="text-lg font-mono font-bold text-slate-900">{selectedLand?.latitude}</p>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Center Latitude</label>
+                  <p className="text-lg font-mono font-bold text-slate-900">{selectedLand?.centerLat?.toFixed(6)}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Longitude</label>
-                  <p className="text-lg font-mono font-bold text-slate-900">{selectedLand?.longitude}</p>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Center Longitude</label>
+                  <p className="text-lg font-mono font-bold text-slate-900">{selectedLand?.centerLng?.toFixed(6)}</p>
                 </div>
               </div>
+
+              {/* Survey Information */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Survey Plan Number</label>
+                  <p className="text-lg font-bold text-slate-900">{selectedLand?.surveyPlanNumber || "N/A"}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Survey Type</label>
+                  <p className="text-lg font-bold text-slate-900 capitalize">{selectedLand?.surveyType?.toLowerCase() || "N/A"}</p>
+                </div>
+              </div>
+
+              {selectedLand?.surveyDate && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Survey Date</label>
+                  <p className="text-lg font-bold text-slate-900">{new Date(selectedLand.surveyDate).toLocaleDateString()}</p>
+                </div>
+              )}
+
+              {/* Surveyor Information */}
+              {(selectedLand?.surveyorName || selectedLand?.surveyorLicense) && (
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Surveyor Name</label>
+                    <p className="text-lg font-bold text-slate-900">{selectedLand?.surveyorName || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Surveyor License</label>
+                    <p className="text-lg font-bold text-slate-900">{selectedLand?.surveyorLicense || "N/A"}</p>
+                  </div>
+                </div>
+              )}
+
+              {(selectedLand?.surveyorAddress || selectedLand?.surveyTelephone) && (
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Surveyor Address</label>
+                    <p className="text-lg font-bold text-slate-900">{selectedLand?.surveyorAddress || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Surveyor Telephone</label>
+                    <p className="text-lg font-bold text-slate-900">{selectedLand?.surveyTelephone || "N/A"}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Plot and UTM Information */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Plot Number</label>
+                  <p className="text-lg font-bold text-slate-900">{selectedLand?.plotNumber || "N/A"}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">UTM Zone</label>
+                  <p className="text-lg font-bold text-slate-900">{selectedLand?.utmZone || "N/A"}</p>
+                </div>
+              </div>
+
+              {/* Area Information */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Calculated Area</label>
+                  <p className="text-lg font-bold text-slate-900">{selectedLand?.areaSqm?.toFixed(2)} sqm</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Measured Area</label>
+                  <p className="text-lg font-bold text-slate-900">{selectedLand?.measuredAreaSqm ? `${selectedLand.measuredAreaSqm.toFixed(2)} sqm` : "N/A"}</p>
+                </div>
+              </div>
+
+              {/* Accuracy Level */}
+              {selectedLand?.accuracyLevel && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Accuracy Level</label>
+                  <p className="text-lg font-bold text-slate-900 capitalize">{selectedLand.accuracyLevel.replace("_", " ")}</p>
+                </div>
+              )}
+
+              {/* Survey Notes */}
+              {selectedLand?.surveyNotes && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Survey Notes</label>
+                  <p className="text-lg font-bold text-slate-900">{selectedLand.surveyNotes}</p>
+                </div>
+              )}
+
+              {/* Parent Land ID */}
+              {selectedLand?.parentLandId && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Parent Land ID</label>
+                  <p className="text-lg font-mono font-bold text-slate-900">{selectedLand.parentLandId}</p>
+                </div>
+              )}
+
+              {/* Bearing Data for Bearing Surveys */}
+              {selectedLand?.surveyType === "BEARING" && selectedLand?.bearings && selectedLand.bearings.length > 0 && (
+                <div className="pt-4 border-t">
+                  <h3 className="font-bold text-slate-900 mb-4 text-lg">Bearing Survey Data</h3>
+                  <div className="grid md:grid-cols-2 gap-6 mb-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Starting Point</label>
+                      <p className="text-sm font-mono text-slate-900">
+                        Lat: {selectedLand?.startPoint?.[0]?.toFixed(6) || "N/A"}
+                      </p>
+                      <p className="text-sm font-mono text-slate-900">
+                        Lng: {selectedLand?.startPoint?.[1]?.toFixed(6) || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Number of Bearings</label>
+                      <p className="text-lg font-bold text-slate-900">{selectedLand.bearings.length}</p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-slate-300">
+                      <thead className="bg-slate-100">
+                        <tr>
+                          <th className="border border-slate-300 px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase">Bearing #</th>
+                          <th className="border border-slate-300 px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase">Distance (m)</th>
+                          <th className="border border-slate-300 px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase">Bearing (°)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedLand.bearings.map((bearing: any, index: number) => (
+                          <tr key={index} className="odd:bg-white even:bg-slate-50">
+                            <td className="border border-slate-300 px-4 py-2 font-semibold">{index + 1}</td>
+                            <td className="border border-slate-300 px-4 py-2 font-mono">{bearing.distance?.toFixed(2) || "N/A"}</td>
+                            <td className="border border-slate-300 px-4 py-2 font-mono">{bearing.bearing?.toFixed(2) || "N/A"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Coordinate Data for Coordinate Surveys */}
+              {selectedLand?.surveyType === "COORDINATE" && selectedLand?.coordinates && selectedLand.coordinates.length > 0 && (
+                <div className="pt-4 border-t">
+                  <h3 className="font-bold text-slate-900 mb-4 text-lg">Coordinate Survey Data</h3>
+                  <div className="mb-4">
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Number of Points</label>
+                    <p className="text-lg font-bold text-slate-900">{selectedLand.coordinates.length}</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-slate-300">
+                      <thead className="bg-slate-100">
+                        <tr>
+                          <th className="border border-slate-300 px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase">Point #</th>
+                          <th className="border border-slate-300 px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase">Latitude</th>
+                          <th className="border border-slate-300 px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase">Longitude</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedLand.coordinates.map((coord: any, index: number) => (
+                          <tr key={index} className="odd:bg-white even:bg-slate-50">
+                            <td className="border border-slate-300 px-4 py-2 font-semibold">{index + 1}</td>
+                            <td className="border border-slate-300 px-4 py-2 font-mono">{coord[0]?.toFixed(6) || "N/A"}</td>
+                            <td className="border border-slate-300 px-4 py-2 font-mono">{coord[1]?.toFixed(6) || "N/A"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Title Type */}
               <div>
@@ -530,7 +737,7 @@ const LandRegistrationList = () => {
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 text-white flex items-center justify-between sticky top-0 z-10">
               <div>
                 <h2 className="text-2xl font-bold">{mapLand?.ownerName || mapLand?.id?.slice(0, 12)}</h2>
-                <p className="text-indigo-100 text-sm mt-1">Size: {mapLand?.squareMeters ? `${mapLand.squareMeters} sqm` : "N/A"}</p>
+                <p className="text-indigo-100 text-sm mt-1">Size: {mapLand?.areaSqm ? `${mapLand.areaSqm.toFixed(2)} sqm` : "N/A"}</p>
               </div>
               <button
                 onClick={() => setMapLand(null)}
@@ -541,7 +748,15 @@ const LandRegistrationList = () => {
             </div>
 
             <div className="p-6">
-              <ShowMap lat={mapLand?.latitude} lng={mapLand?.longitude} squareMeters={mapLand?.squareMeters} title={mapLand?.ownerName || mapLand?.id} />
+              <ShowMap 
+                lat={mapLand?.centerLat} 
+                lng={mapLand?.centerLng} 
+                squareMeters={mapLand?.areaSqm} 
+                title={mapLand?.ownerName || mapLand?.id}
+                coordinates={mapLand?.coordinates || mapLand?.latlngCoordinates}
+                bearings={mapLand?.bearings}
+                surveyType={mapLand?.surveyType}
+              />
             </div>
 
             <div className="sticky bottom-0 bg-slate-50 border-t px-6 py-4 flex gap-3 justify-end">
@@ -552,6 +767,27 @@ const LandRegistrationList = () => {
                 Close
               </button>
             </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Survey Plan Modal */}
+      {surveyPlanLand && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setSurveyPlanLand(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-6xl w-full max-h-[95vh] overflow-auto"
+          >
+            <SurveyPlan land={surveyPlanLand} onClose={() => setSurveyPlanLand(null)} />
           </motion.div>
         </motion.div>
       )}

@@ -39,6 +39,8 @@ const OwnerShipTransferDetails = () => {
     }
   };
 
+  console.log("Progress:", progress);
+
   if (loading) {
     return (
       <motion.div
@@ -107,7 +109,7 @@ const OwnerShipTransferDetails = () => {
           <div className="text-right flex-shrink-0">
             <p className="text-blue-100 text-xs font-semibold uppercase tracking-wide">Current Status</p>
             <div className="mt-1 sm:mt-2 inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-white bg-opacity-20 rounded-lg">
-              <p className="text-base sm:text-lg md:text-xl font-bold">{progress.currentStatus.replace(/_/g, " ")}</p>
+              <p className="text-base sm:text-lg md:text-xl font-bold">{progress.currentStatus?.replace(/_/g, " ") || "Unknown"}</p>
             </div>
           </div>
         </div>
@@ -136,8 +138,8 @@ const OwnerShipTransferDetails = () => {
               className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200"
             >
               <p className="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-2">Address</p>
-              <p className="text-xl font-bold text-gray-900">{progress.landDetails.address}</p>
-              <p className="text-sm text-gray-600 mt-2">{progress.landDetails.state}</p>
+              <p className="text-xl font-bold text-gray-900">{progress.landDetails?.address}</p>
+              <p className="text-sm text-gray-600 mt-2">{progress.landDetails?.state}</p>
             </motion.div>
 
             {/* Size */}
@@ -150,7 +152,7 @@ const OwnerShipTransferDetails = () => {
               <p className="text-sm font-semibold text-purple-600 uppercase tracking-wide mb-2">Land Size</p>
               <div className="flex items-center gap-3">
                 <FaRuler className="text-3xl text-purple-600" />
-                <span className="text-3xl font-bold text-gray-900">{progress.landDetails.size}</span>
+                <span className="text-3xl font-bold text-gray-900">{progress.landDetails?.size}</span>
                 <span className="text-lg text-gray-600 font-semibold">m²</span>
               </div>
             </motion.div>
@@ -193,10 +195,10 @@ const OwnerShipTransferDetails = () => {
             <FaCalendarAlt className="text-lg sm:text-xl md:text-2xl text-teal-600 flex-shrink-0" />
             <div className="min-w-0">
               <p className="font-bold text-gray-900 text-xs sm:text-sm md:text-base">
-                {new Date(progress.timestamps.createdAt).toLocaleDateString()}
+                {new Date(progress.timestamps?.createdAt).toLocaleDateString()}
               </p>
               <p className="text-xs text-gray-600">
-                {new Date(progress.timestamps.createdAt).toLocaleTimeString()}
+                {new Date(progress.timestamps?.createdAt).toLocaleTimeString()}
               </p>
             </div>
           </div>
@@ -214,10 +216,10 @@ const OwnerShipTransferDetails = () => {
             <FaClock className="text-lg sm:text-xl md:text-2xl text-red-600 flex-shrink-0" />
             <div className="min-w-0">
               <p className="font-bold text-gray-900 text-xs sm:text-sm md:text-base">
-                {new Date(progress.timestamps.expiresAt).toLocaleDateString()}
+                {new Date(progress.timestamps?.expiresAt).toLocaleDateString()}
               </p>
               <p className="text-xs text-gray-600">
-                {new Date(progress.timestamps.expiresAt).toLocaleTimeString()}
+                {new Date(progress.timestamps?.expiresAt).toLocaleTimeString()}
               </p>
             </div>
           </div>

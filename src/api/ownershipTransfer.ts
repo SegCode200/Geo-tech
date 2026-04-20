@@ -5,8 +5,13 @@ export interface InitiateTransferRequest {
   landId: string;
   newOwnerEmail?: string;
   newOwnerPhone?: string;
-  emails?: string[];
-  phones?: string[];
+  transferType: "FULL" | "PARTIAL";
+  transferSurveyType?: "COORDINATE" | "BEARING";
+  coordinates?: number[][];
+  bearings?: Array<{ distance: number; bearing: number }>;
+  startPoint?: [number, number];
+  utmZone?: string;
+  measuredAreaSqm?: number;
 }
 
 export interface InitiateTransferResponse {
@@ -42,6 +47,18 @@ export interface SubmitDocumentsResponse {
   message: string;
   transferId: string;
   documentsCount: number;
+}
+
+export interface TransferDetailsResponse {
+  transferId: string;
+  landId: string;
+  transferType: "FULL" | "PARTIAL";
+  status: string;
+  currentOwnerId: string;
+  newOwnerEmail?: string;
+  newOwnerPhone?: string;
+  createdAt: string;
+  expiresAt: string;
 }
 
 export interface TransferProgressResponse {
@@ -104,17 +121,18 @@ export interface TransferItem {
   land: {
     id: string;
     address: string;
-    size: number;
+    areaSqm: number;
     state: string;
-    currentOwner: string;
+    ownerName: string;
   };
-  documentation: {
+  documents?: Array<any>;
+  documentation?: {
     submitted: number;
     approved: number;
     rejected: number;
     pending: number;
   };
-  verification: {
+  verification?: {
     verified: number;
     total: number;
     progress: number;
@@ -138,7 +156,7 @@ export async function verifyTransferOTP(
   data: VerifyOTPRequest
 ): Promise<VerifyOTPResponse> {
   try {
-    const res = await api.post("/ownership/verify-otp", data);
+    const res = await api.post("/ownership/verify", data);
     return res.data;
   } catch (err: any) {
     throw normalizeAxiosError(err);
@@ -150,7 +168,7 @@ export async function resendTransferOTP(
   target: string
 ): Promise<{ message: string }> {
   try {
-    const res = await api.post("/ownership/resend-otp", { transferId, target });
+    const res = await api.post(`/ownership/${transferId}/resend-otp`, { target });
     return res.data;
   } catch (err: any) {
     throw normalizeAxiosError(err);
@@ -170,7 +188,7 @@ export async function submitTransferDocuments(
     });
 
     const res = await api.post(
-      `/ownership/${data.transferId}/submit-documents`,
+      `/ownership/${data.transferId}/upload-documents`,
       formData,
       {
         headers: {
@@ -184,12 +202,31 @@ export async function submitTransferDocuments(
   }
 }
 
+export async function getTransferDetails(
+  transferId: string
+): Promise<TransferDetailsResponse> {
+  try {
+    const res = await api.get(`/ownership/${transferId}/details`);
+    return res.data;
+  } catch (err: any) {
+    throw normalizeAxiosError(err);
+  }
+}
+
 export async function getTransferProgress(
   transferId: string
 ): Promise<TransferProgressResponse> {
   try {
     const res = await api.get(`/ownership/${transferId}/progress`);
-    return res.data;
+    const data = res.data;
+    console.log("Transfer Progress:", data);
+    if (Array.isArray(data)) {
+      return data[0];
+    }
+    if (data?.transfers) {
+      return data.transfers[0];
+    }
+    return data;
   } catch (err: any) {
     throw normalizeAxiosError(err);
   }
@@ -197,7 +234,7 @@ export async function getTransferProgress(
 
 export async function listUserTransfers(): Promise<TransferListResponse> {
   try {
-    const res = await api.get("/ownership/user-transfer-list");
+    const res = await api.get("/ownership/user-transfers");
     return res.data;
   } catch (err: any) {
     throw normalizeAxiosError(err);

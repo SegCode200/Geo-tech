@@ -11,6 +11,9 @@ interface ShowMapProps {
   lng?: number;
   squareMeters?: number;
   title?: string;
+  coordinates?: number[][];
+  bearings?: { distance: number; bearing: number }[];
+  surveyType?: string;
 }
 
 const getZoomForRadius = (radiusMeters: number | null) => {
@@ -38,18 +41,14 @@ const loadScript = (src: string) => {
   });
 };
 
-const ShowMap: React.FC<ShowMapProps> = ({ lat, lng, squareMeters, title }) => {
+const ShowMap: React.FC<ShowMapProps> = ({ lat, lng, squareMeters, title, coordinates, bearings, surveyType }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const circleRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!lat || !lng || !containerRef.current) return;
-
-    const area = squareMeters || 0;
-    const radius = area > 0 ? Math.sqrt(area / Math.PI) : 30;
-    const zoom = getZoomForRadius(radius);
+    if (!containerRef.current) return;
 
     const key = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -68,7 +67,31 @@ const ShowMap: React.FC<ShowMapProps> = ({ lat, lng, squareMeters, title }) => {
         const g = (window as any).google;
         if (!g) throw new Error("Google maps SDK not available");
 
-        const center = { lat: Number(lat), lng: Number(lng) };
+        let center: { lat: number; lng: number };
+        let zoom = 15;
+
+        if (coordinates && coordinates.length > 0) {
+          // Calculate center from coordinates
+          const lats = coordinates.map(c => c[0]);
+          const lngs = coordinates.map(c => c[1]);
+          center = {
+            lat: (Math.min(...lats) + Math.max(...lats)) / 2,
+            lng: (Math.min(...lngs) + Math.max(...lngs)) / 2
+          };
+          // Calculate zoom based on bounds
+          const latRange = Math.max(...lats) - Math.min(...lats);
+          const lngRange = Math.max(...lngs) - Math.min(...lngs);
+          const maxRange = Math.max(latRange, lngRange);
+          zoom = maxRange > 0.01 ? 13 : maxRange > 0.001 ? 15 : 17;
+        } else if (lat && lng) {
+          center = { lat: Number(lat), lng: Number(lng) };
+          const area = squareMeters || 0;
+          const radius = area > 0 ? Math.sqrt(area / Math.PI) : 30;
+          zoom = getZoomForRadius(radius);
+        } else {
+          return; // No coordinates
+        }
+
         const map = new g.maps.Map(containerRef.current, {
           center,
           zoom,
@@ -76,32 +99,89 @@ const ShowMap: React.FC<ShowMapProps> = ({ lat, lng, squareMeters, title }) => {
         });
         mapRef.current = map;
 
-        const marker = new g.maps.Marker({ position: center, map, title: title || "Land location" });
-        markerRef.current = marker;
-
-        const infoWindow = new g.maps.InfoWindow({
-          content: `<strong>${title || "Land location"}</strong><br/>${area ? `${area} sqm` : "Size: N/A"}`,
-        });
-        infoWindow.open({ anchor: marker, map, shouldFocus: false } as any);
-
-        if (area > 0) {
-          const circle = new g.maps.Circle({
+        if (coordinates && coordinates.length > 0) {
+          // Draw polygon
+          const polygonCoords = coordinates.map(coord => ({ lat: coord[0], lng: coord[1] }));
+          new g.maps.Polygon({
+            paths: polygonCoords,
             strokeColor: "#2563eb",
             strokeOpacity: 0.8,
             strokeWeight: 2,
             fillColor: "#2563eb",
             fillOpacity: 0.15,
             map,
-            center,
-            radius,
           });
-          circleRef.current = circle;
+
+          // Add markers for each point
+          const markers: any[] = [];
+          coordinates.forEach((coord, index) => {
+            const marker = new g.maps.Marker({
+              position: { lat: coord[0], lng: coord[1] },
+              map,
+              label: `${index + 1}`,
+              title: `Point ${index + 1}`,
+            });
+            markers.push(marker);
+          });
+
+          // Add bearing info if available
+          if (bearings && bearings.length > 0 && surveyType === "BEARING") {
+            bearings.forEach((bearing, index) => {
+              const start = coordinates[index];
+              const end = coordinates[(index + 1) % coordinates.length];
+              if (start && end) {
+                new g.maps.InfoWindow({
+                  content: `Distance: ${bearing.distance.toFixed(2)}m<br>Bearing: ${bearing.bearing.toFixed(2)}°`,
+                  position: {
+                    lat: (start[0] + end[0]) / 2,
+                    lng: (start[1] + end[1]) / 2
+                  },
+                  map,
+                });
+              }
+            });
+          }
+
+          // Fit bounds to polygon
+          const bounds = new g.maps.LatLngBounds();
+          coordinates.forEach(coord => bounds.extend({ lat: coord[0], lng: coord[1] }));
+          map.fitBounds(bounds);
+        } else if (lat && lng) {
+          // Original point and circle logic
+          const marker = new g.maps.Marker({ position: center, map, title: title || "Land location" });
+          markerRef.current = marker;
+
+          const infoWindow = new g.maps.InfoWindow({
+            content: `<strong>${title || "Land location"}</strong><br/>${squareMeters ? `${squareMeters} sqm` : "Size: N/A"}`,
+          });
+          infoWindow.open({ anchor: marker, map, shouldFocus: false } as any);
+
+          if (squareMeters && squareMeters > 0) {
+            const radius = Math.sqrt(squareMeters / Math.PI);
+            const circle = new g.maps.Circle({
+              strokeColor: "#2563eb",
+              strokeOpacity: 0.8,
+              strokeWeight: 2,
+              fillColor: "#2563eb",
+              fillOpacity: 0.15,
+              map,
+              center,
+              radius,
+            });
+            circleRef.current = circle;
+          }
         }
 
         // Fix sizing issues when container resizes
         setTimeout(() => {
           g.maps.event.trigger(map, "resize");
-          map.setCenter(center);
+          if (coordinates && coordinates.length > 0) {
+            const bounds = new g.maps.LatLngBounds();
+            coordinates.forEach(coord => bounds.extend({ lat: coord[0], lng: coord[1] }));
+            map.fitBounds(bounds);
+          } else {
+            map.setCenter(center);
+          }
         }, 0);
       })
       .catch((err) => {
@@ -123,9 +203,9 @@ const ShowMap: React.FC<ShowMapProps> = ({ lat, lng, squareMeters, title }) => {
         mapRef.current = null;
       }
     };
-  }, [lat, lng, squareMeters, title]);
+  }, [lat, lng, squareMeters, title, coordinates, bearings, surveyType]);
 
-  if (!lat || !lng) {
+  if (!coordinates && !lat && !lng) {
     return (
       <div className="p-6 text-center">
         <p className="text-slate-700">Coordinates not available for this land.</p>

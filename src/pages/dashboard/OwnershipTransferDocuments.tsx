@@ -13,7 +13,7 @@ import {
   FaCheckDouble,
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
-import { submitTransferDocuments, getTransferProgress, TransferProgressResponse } from "../../api/ownershipTransfer";
+import { submitTransferDocuments, getTransferProgress, getTransferDetails } from "../../api/ownershipTransfer";
 import { errorToast, successToast } from "../../utils/toast";
 
 interface DocumentUpload {
@@ -24,12 +24,14 @@ interface DocumentUpload {
 }
 
 const DOCUMENT_TYPES = [
-  { id: "deed", label: "Deed of Transfer" },
-  { id: "identity", label: "Identity Document" },
-  { id: "survey", label: "Survey Plan" },
-  { id: "payment_proof", label: "Payment Proof" },
-  { id: "consent_letter", label: "Consent Letter" },
-  { id: "other", label: "Other Documents" },
+  { id: "TRANSFER_AGREEMENT", label: "Transfer Agreement" },
+  { id: "ID_DOCUMENT_CURRENT_OWNER", label: "Current Owner ID Document" },
+  { id: "ID_DOCUMENT_NEW_OWNER", label: "New Owner ID Document" },
+  { id: "PAYMENT_RECEIPT", label: "Payment Receipt" },
+  { id: "SURVEY_DOCUMENT", label: "Survey Document" },
+  { id: "SUBDIVISION_AGREEMENT", label: "Subdivision Agreement" },
+  { id: "UPDATED_TITLE_DOCUMENT", label: "Updated Title Document" },
+  { id: "OTHER", label: "Other (consent letter and the rest)" },
 ];
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -42,6 +44,29 @@ const ALLOWED_TYPES = [
   "image/jpg",
 ];
 
+const getMandatoryDocuments = (transferType: string): string[] => {
+  const baseDocs = [
+    "TRANSFER_AGREEMENT",
+    "ID_DOCUMENT_CURRENT_OWNER",
+    "ID_DOCUMENT_NEW_OWNER",
+    "PAYMENT_RECEIPT",
+    "SURVEY_DOCUMENT", // Required for both, but auto-generated for partial
+    "OTHER",
+  ];
+
+  if (transferType === "PARTIAL") {
+    return [
+      ...baseDocs,
+      "SUBDIVISION_AGREEMENT",
+      "UPDATED_TITLE_DOCUMENT",
+    ];
+
+
+  }
+
+  return baseDocs;
+};
+
 export const OwnershipTransferDocuments = () => {
   const { transferId } = useParams<{ transferId: string }>();
   const navigate = useNavigate();
@@ -51,7 +76,8 @@ export const OwnershipTransferDocuments = () => {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
-  const [progress, setProgress] = useState<TransferProgressResponse | null>(null);
+  const [progress, setProgress] = useState<any>(null);
+  const [transferDetails, setTransferDetails] = useState<any>(null);
   const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
@@ -63,8 +89,12 @@ export const OwnershipTransferDocuments = () => {
   const loadTransferProgress = async () => {
     try {
       setLoading(true);
-      const data = await getTransferProgress(transferId!);
-      setProgress(data);
+      const [progressData, detailsData] = await Promise.all([
+        getTransferProgress(transferId!),
+        getTransferDetails(transferId!)
+      ]);
+      setProgress(progressData);
+      setTransferDetails(detailsData);
     } catch (error: any) {
       console.error("Error loading transfer:", error);
       errorToast("Failed to load transfer details");
@@ -179,6 +209,22 @@ export const OwnershipTransferDocuments = () => {
       setMessage(`Please classify all documents. ${unclassified.length} document(s) missing document type.`);
       setMessageType("error");
       return;
+    }
+
+    // Check mandatory documents
+    if (transferDetails) {
+      const mandatoryDocs = getMandatoryDocuments(transferDetails.transferType);
+      const uploadedTypes = documents.map((d) => d.type);
+      const missingDocs = mandatoryDocs.filter(type => !uploadedTypes.includes(type));
+
+      if (missingDocs.length > 0) {
+        const missingLabels = missingDocs.map(type =>
+          DOCUMENT_TYPES.find(dt => dt.id === type)?.label || type
+        );
+        setMessage(`Missing mandatory documents: ${missingLabels.join(", ")}`);
+        setMessageType("error");
+        return;
+      }
     }
 
     try {
@@ -297,6 +343,30 @@ export const OwnershipTransferDocuments = () => {
         >
           <h2 className="text-base sm:text-lg md:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Upload Documents</h2>
 
+          {/* Mandatory Documents Info */}
+          {transferDetails && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-sm font-semibold text-blue-800 mb-2">Required Documents ({transferDetails.transferType} Transfer)</h3>
+              <ul className="text-xs text-blue-700 space-y-1">
+                {getMandatoryDocuments(transferDetails.transferType).map(docType => {
+                  const docInfo = DOCUMENT_TYPES.find(dt => dt.id === docType);
+                  return (
+                    <li key={docType} className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></span>
+                      {docInfo?.label || docType}
+                      {docType === "SURVEY_DOCUMENT" && transferDetails.transferType === "PARTIAL" && (
+                        <span className="text-green-600 font-medium">(Auto-generated)</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="text-xs text-blue-600 mt-2">
+                * Documents marked with * are mandatory. Additional documents can be uploaded as needed.
+              </p>
+            </div>
+          )}
+
           <div
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -384,11 +454,15 @@ export const OwnershipTransferDocuments = () => {
                             required
                           >
                             <option value="">Select document type...</option>
-                            {DOCUMENT_TYPES.map((type) => (
-                              <option key={type.id} value={type.id}>
-                                {type.label}
-                              </option>
-                            ))}
+                            {DOCUMENT_TYPES.map((type) => {
+                              const isMandatory = transferDetails ?
+                                getMandatoryDocuments(transferDetails.transferType).includes(type.id) : false;
+                              return (
+                                <option key={type.id} value={type.id}>
+                                  {type.label}{isMandatory ? " *" : ""}
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
 

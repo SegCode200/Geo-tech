@@ -120,6 +120,15 @@ export async function landRegisteration(formData: FormData) {
   }
 }
 
+export async function verifyLand(data: any) {
+  try {
+    const res = await api.post("/lands/verify-land", data);
+    return res.data;
+  } catch (error) {
+    throw normalizeAxiosError(error);
+  }
+}
+
 export async function getLandRegistrations() {
   try {
     const res = await api.get("/lands/get-user-lands");
@@ -141,7 +150,7 @@ export async function getStates() {
 
 export async function deleteLand(landId: string) {
   try {
-    const res = await api.delete(`/lands/${landId}`);
+    const res = await api.delete(`/lands/delete-land/${landId}`);
     return res.data;
   } catch (error) {
     throw normalizeAxiosError(error);

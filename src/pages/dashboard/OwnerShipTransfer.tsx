@@ -14,6 +14,9 @@ import {
   FaSpinner,
   FaCheck,
   FaTimes,
+  FaMapMarkerAlt,
+  FaCompass,
+  FaTrash,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import {
@@ -30,6 +33,13 @@ const OwnershipTransfer = () => {
     landId: "",
     newOwnerEmail: "",
     newOwnerPhone: "",
+    transferType: "FULL", // "FULL" or "PARTIAL"
+    transferSurveyType: "COORDINATE", // "COORDINATE" or "BEARING"
+    coordinates: [{ lat: "", lng: "" }, { lat: "", lng: "" }, { lat: "", lng: "" }, { lat: "", lng: "" }],
+    bearings: [{ distance: "", bearing: "" }, { distance: "", bearing: "" }, { distance: "", bearing: "" }],
+    startPoint: { lat: "", lng: "" },
+    utmZone: "",
+    measuredAreaSqm: "",
     extraEmail: "",
     extraPhone: "",
     emails: [] as string[],
@@ -48,6 +58,8 @@ const OwnershipTransfer = () => {
     loadTransfersAndLands();
   }, []);
 
+  // console.log(lands)
+
   const loadTransfersAndLands = async () => {
     try {
       setLoadingTransfers(true);
@@ -56,16 +68,20 @@ const OwnershipTransfer = () => {
         getLandsByUser(),
       ]);
 
+
       // Support multiple response shapes: either { transfers: [...] } or direct arrays
       setApplications(transfersData?.transfers || transfersData || []);
       setLands(landsData?.lands || landsData || []);
     } catch (error: any) {
-      console.error("Error loading data:", error);
+      // console.error("Error loading data:", error);
       errorToast( "Failed to load transfer data");
     } finally {
       setLoadingTransfers(false);
     }
   };
+
+  // console.log(applications)
+  // console.log(lands)
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -173,6 +189,56 @@ const OwnershipTransfer = () => {
     }));
   };
 
+  // Handle Coordinates Change
+  const handleCoordinateChange = (index: number, field: 'lat' | 'lng', value: string) => {
+    const updatedCoordinates = [...formData.coordinates];
+    updatedCoordinates[index] = { ...updatedCoordinates[index], [field]: value };
+    setFormData((prev) => ({ ...prev, coordinates: updatedCoordinates }));
+  };
+
+  const addCoordinatePoint = () => {
+    setFormData((prev) => ({
+      ...prev,
+      coordinates: [...prev.coordinates, { lat: "", lng: "" }],
+    }));
+  };
+
+  const removeCoordinatePoint = (index: number) => {
+    if (formData.coordinates.length > 4) {
+      const updatedCoordinates = formData.coordinates.filter((_, i) => i !== index);
+      setFormData((prev) => ({ ...prev, coordinates: updatedCoordinates }));
+    }
+  };
+
+  // Handle Bearings Change
+  const handleBearingChange = (index: number, field: 'distance' | 'bearing', value: string) => {
+    const updatedBearings = [...formData.bearings];
+    updatedBearings[index] = { ...updatedBearings[index], [field]: value };
+    setFormData((prev) => ({ ...prev, bearings: updatedBearings }));
+  };
+
+  const addBearing = () => {
+    setFormData((prev) => ({
+      ...prev,
+      bearings: [...prev.bearings, { distance: "", bearing: "" }],
+    }));
+  };
+
+  const removeBearing = (index: number) => {
+    if (formData.bearings.length > 3) {
+      const updatedBearings = formData.bearings.filter((_, i) => i !== index);
+      setFormData((prev) => ({ ...prev, bearings: updatedBearings }));
+    }
+  };
+
+  // Handle Start Point Change
+  const handleStartPointChange = (field: 'lat' | 'lng', value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      startPoint: { ...prev.startPoint, [field]: value },
+    }));
+  };
+
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setMessage("");
@@ -195,8 +261,43 @@ const OwnershipTransfer = () => {
       return;
     }
 
+    // Validate partial transfer data
+    if (formData.transferType === "PARTIAL") {
+      if (formData.transferSurveyType === "COORDINATE") {
+        const validCoords = formData.coordinates.filter(coord => coord.lat && coord.lng);
+        if (validCoords.length < 4) {
+          setMessage("At least 4 coordinate points required for partial transfer");
+          setMessageType("error");
+          return;
+        }
+        if (!formData.utmZone) {
+          setMessage("UTM zone required for coordinate survey");
+          setMessageType("error");
+          return;
+        }
+      } else if (formData.transferSurveyType === "BEARING") {
+        const validBearings = formData.bearings.filter(bearing => bearing.distance && bearing.bearing);
+        if (validBearings.length < 3) {
+          setMessage("At least 3 bearings required for partial transfer");
+          setMessageType("error");
+          return;
+        }
+        if (!formData.startPoint.lat || !formData.startPoint.lng) {
+          setMessage("Starting point required for bearing survey");
+          setMessageType("error");
+          return;
+        }
+        if (!formData.utmZone) {
+          setMessage("UTM zone required for bearing survey");
+          setMessageType("error");
+          return;
+        }
+      }
+    }
+
     try {
       setLoading(true);
+
 
       // Merge extraEmail/extraPhone into the arrays if present (and avoid duplicates/primary)
       const emailsPayload = [...formData.emails];
@@ -211,13 +312,40 @@ const OwnershipTransfer = () => {
         phonesPayload.push(extraPhone);
       }
 
-      const result = await initiateOwnershipTransfer({
+      // Prepare transfer data
+      const transferData: any = {
         landId: formData.landId,
-        emails: emailsPayload,
-        phones: phonesPayload,
         newOwnerEmail: formData.newOwnerEmail,
         newOwnerPhone: formData.newOwnerPhone,
-      });
+        transferType: formData.transferType,
+      };
+
+      // Add survey data for partial transfers
+      if (formData.transferType === "PARTIAL") {
+        transferData.transferSurveyType = formData.transferSurveyType;
+
+        if (formData.transferSurveyType === "COORDINATE") {
+          transferData.coordinates = formData.coordinates
+            .filter(coord => coord.lat && coord.lng)
+            .map(coord => [parseFloat(coord.lat), parseFloat(coord.lng)]);
+          transferData.utmZone = formData.utmZone;
+        } else if (formData.transferSurveyType === "BEARING") {
+          transferData.bearings = formData.bearings
+            .filter(bearing => bearing.distance && bearing.bearing)
+            .map(bearing => ({
+              distance: parseFloat(bearing.distance),
+              bearing: parseFloat(bearing.bearing)
+            }));
+          transferData.startPoint = [parseFloat(formData.startPoint.lat), parseFloat(formData.startPoint.lng)];
+          transferData.utmZone = formData.utmZone;
+        }
+
+        if (formData.measuredAreaSqm && !isNaN(parseFloat(formData.measuredAreaSqm)) && parseFloat(formData.measuredAreaSqm) > 0) {
+          transferData.measuredAreaSqm = parseFloat(formData.measuredAreaSqm);
+        }
+      }
+
+      const result = await initiateOwnershipTransfer(transferData);
 
       setMessage("Ownership transfer initiated successfully!");
       setMessageType("success");
@@ -227,6 +355,13 @@ const OwnershipTransfer = () => {
         landId: "",
         newOwnerEmail: "",
         newOwnerPhone: "",
+        transferType: "FULL",
+        transferSurveyType: "COORDINATE",
+        coordinates: [{ lat: "", lng: "" }, { lat: "", lng: "" }, { lat: "", lng: "" }, { lat: "", lng: "" }],
+        bearings: [{ distance: "", bearing: "" }, { distance: "", bearing: "" }, { distance: "", bearing: "" }],
+        startPoint: { lat: "", lng: "" },
+        utmZone: "",
+        measuredAreaSqm: "",
         extraEmail: "",
         extraPhone: "",
         emails: [],
@@ -243,6 +378,7 @@ const OwnershipTransfer = () => {
         navigate(`/dashboard/ownership-transfer/${result.transferId}`);
       }, 2000);
     } catch (error: any) {
+      // console.log(error)
       setMessage(error.message || "Failed to initiate transfer");
       setMessageType("error");
     } finally {
@@ -331,12 +467,275 @@ const OwnershipTransfer = () => {
                   {lands.map((land) => (
                     <option key={land.id} value={land.id}>
                       #{(land.id).slice(0,6).toUpperCase() || land.name} (
-                      {land.squareMeters ?? land.size ?? land.totalSquareMeters ?? land.area ?? "N/A"}m²)
+                      {land.areaSqm ?? land.size ?? land.totalSquareMeters ?? land.area ?? "N/A"}m²)
                     </option>
                   ))}
                 </select>
               </div>
             </motion.div>
+
+            {/* Transfer Type Section */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.22 }}
+              className="bg-white rounded-lg md:rounded-xl shadow-md p-4 md:p-6 border-l-4 border-green-500"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <FaExchangeAlt className="text-green-600 text-lg md:text-xl" />
+                <h2 className="text-base md:text-lg font-bold text-gray-900">Transfer Type</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
+                    Transfer Type <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    name="transferType"
+                    value={formData.transferType}
+                    onChange={handleChange}
+                    className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+                  >
+                    <option value="FULL">Full Transfer (Entire Land)</option>
+                    <option value="PARTIAL">Partial Transfer (Portion of Land)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.transferType === "FULL"
+                      ? "Transfer ownership of the entire land parcel"
+                      : "Transfer ownership of a specific portion of the land"}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Survey Data Section - Only show for PARTIAL transfers */}
+            {formData.transferType === "PARTIAL" && (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.23 }}
+                className="bg-white rounded-lg md:rounded-xl shadow-md p-4 md:p-6 border-l-4 border-orange-500"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <FaCompass className="text-orange-600 text-lg md:text-xl" />
+                  <h2 className="text-base md:text-lg font-bold text-gray-900">Transfer Boundary Survey</h2>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Survey Type Selection */}
+                  <div>
+                    <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
+                      Survey Method <span className="text-red-600">*</span>
+                    </label>
+                    <select
+                      name="transferSurveyType"
+                      value={formData.transferSurveyType}
+                      onChange={handleChange}
+                      className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                    >
+                      <option value="COORDINATE">Coordinate Survey (Latitude/Longitude)</option>
+                      <option value="BEARING">Bearing Survey (Distance & Bearing)</option>
+                    </select>
+                  </div>
+
+                  {/* Coordinate Survey */}
+                  {formData.transferSurveyType === "COORDINATE" && (
+                    <>
+                      <div>
+                        <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-4">
+                          GPS Coordinates <span className="text-red-600">*</span> (At least 4 points required)
+                        </label>
+                        <div className="space-y-3">
+                          {formData.coordinates.map((coord, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                            >
+                              <span className="text-sm font-medium text-gray-600 min-w-[60px]">Point {index + 1}:</span>
+                              <div className="flex gap-3 flex-1">
+                                <input
+                                  type="number"
+                                  placeholder="Latitude (decimal) e.g., 6.5244"
+                                  value={coord.lat}
+                                  onChange={(e) => handleCoordinateChange(index, 'lat', e.target.value)}
+                                  step="0.0000001"
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                                />
+                                <input
+                                  type="number"
+                                  placeholder="Longitude (decimal) e.g., 3.3792"
+                                  value={coord.lng}
+                                  onChange={(e) => handleCoordinateChange(index, 'lng', e.target.value)}
+                                  step="0.0000001"
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                                />
+                              </div>
+                              {formData.coordinates.length > 4 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeCoordinatePoint(index)}
+                                  className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                                  title="Remove point"
+                                >
+                                  <FaTrash />
+                                </button>
+                              )}
+                            </motion.div>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addCoordinatePoint}
+                          className="mt-3 flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
+                        >
+                          <FaMapMarkerAlt />
+                          Add Coordinate Point
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
+                          UTM Zone <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="utmZone"
+                          value={formData.utmZone}
+                          onChange={handleChange}
+                          placeholder="e.g., 31N, 32N, 33N"
+                          className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Bearing Survey */}
+                  {formData.transferSurveyType === "BEARING" && (
+                    <>
+                      <div>
+                        <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-4">
+                          Starting Point <span className="text-red-600">*</span>
+                        </label>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">mE (Easting)</label>
+                            <input
+                              type="number"
+                              placeholder="Easting (mE) e.g., 123456.78"
+                              value={formData.startPoint.lat}
+                              onChange={(e) => handleStartPointChange('lat', e.target.value)}
+                              step="0.01"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">mN (Northing)</label>
+                            <input
+                              type="number"
+                              placeholder="Northing (mN) e.g., 987654.32"
+                              value={formData.startPoint.lng}
+                              onChange={(e) => handleStartPointChange('lng', e.target.value)}
+                              step="0.01"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-4">
+                          Bearings & Distances <span className="text-red-600">*</span> (At least 3 required)
+                        </label>
+                        <div className="space-y-3">
+                          {formData.bearings.map((bearing, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                            >
+                              <span className="text-sm font-medium text-gray-600 min-w-[100px]">BAU {1901 + index}:</span>
+                              <div className="flex gap-3 flex-1">
+                                <input
+                                  type="number"
+                                  placeholder="Distance (meters) e.g., 150.75"
+                                  value={bearing.distance}
+                                  onChange={(e) => handleBearingChange(index, 'distance', e.target.value)}
+                                  step="0.01"
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                                />
+                                <input
+                                  type="number"
+                                  placeholder="Bearing (degrees) e.g., 45.5"
+                                  value={bearing.bearing}
+                                  onChange={(e) => handleBearingChange(index, 'bearing', e.target.value)}
+                                  step="0.1"
+                                  min="0"
+                                  max="360"
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                                />
+                              </div>
+                              {formData.bearings.length > 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeBearing(index)}
+                                  className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                                  title="Remove bearing"
+                                >
+                                  <FaTrash />
+                                </button>
+                              )}
+                            </motion.div>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addBearing}
+                          className="mt-3 flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
+                        >
+                          <FaCompass />
+                          Add Bearing
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
+                          UTM Zone <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="utmZone"
+                          value={formData.utmZone}
+                          onChange={handleChange}
+                          placeholder="e.g., 31N, 32N, 33N"
+                          className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Measured Area */}
+                  <div>
+                    <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
+                      Measured Area (sqm) - Optional
+                    </label>
+                    <input
+                      type="number"
+                      name="measuredAreaSqm"
+                      value={formData.measuredAreaSqm}
+                      onChange={handleChange}
+                      placeholder="Enter measured area"
+                      step="0.01"
+                      className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Area measurement from survey document (will be verified against calculated area)</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {/* New Owner Details Section */}
             <motion.div
@@ -581,26 +980,26 @@ const OwnershipTransfer = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + index * 0.05 }}
                 className={`rounded-lg md:rounded-xl shadow-md p-4 md:p-6 border-2 transition-all hover:shadow-lg cursor-pointer ${getStatusColor(
-                  app.status
+                  app.status || "unknown"
                 )}`}
               >
                 {/* Header with Status */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
-                    <h3 className="text-base md:text-lg font-bold text-gray-900">{app.land.address}</h3>
+                    <h3 className="text-base md:text-lg font-bold text-gray-900">{app.land?.address || "N/A"}</h3>
                     <p className="text-xs md:text-sm text-gray-600 mt-1">
-                      Role: <span className="font-semibold">{app.userRole.replace(/_/g, " ")}</span>
+                      Role: <span className="font-semibold">{app.userRole?.replace(/_/g, " ") || "Unknown"}</span>
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2">
-                      {getStatusIcon(app.status)}
+                      {getStatusIcon(app.status || "unknown")}
                       <span
                         className={`px-3 py-1 rounded-full text-xs md:text-sm font-semibold capitalize ${getStatusBadgeColor(
-                          app.status
+                          app.status || "unknown"
                         )}`}
                       >
-                        {app.status.replace(/_/g, " ")}
+                        {app.status?.replace(/_/g, " ") || "Unknown"}
                       </span>
                     </div>
                   </div>
@@ -611,52 +1010,52 @@ const OwnershipTransfer = () => {
                   <div className="bg-white bg-opacity-60 rounded p-3">
                     <p className="text-xs text-gray-600 font-semibold uppercase">Land Details</p>
                     <p className="text-sm md:text-base text-gray-900 font-semibold">
-                      {app.land.address}
+                      {app.land?.address || "N/A"}
                     </p>
                     <p className="text-xs text-gray-600 mt-1">
-                      {app.land.size}m² • {app.land.state}
+                      {app.land?.areaSqm || 0}m² • {app.land?.state || "N/A"}
                     </p>
                   </div>
 
                   <div className="bg-white bg-opacity-60 rounded p-3">
                     <p className="text-xs text-gray-600 font-semibold uppercase">Current Owner</p>
                     <p className="text-sm md:text-base text-gray-900 font-semibold">
-                      {app.land.currentOwner}
+                      {app.land.ownerName}
                     </p>
                   </div>
                 </div>
 
                 {/* Verification Progress */}
-                {app.verification.total > 0 && (
+                {(app.verification?.total ?? 0) > 0 && (
                   <div className="bg-blue-50 rounded p-3 mb-4 text-xs md:text-sm">
                     <div className="flex items-center justify-between mb-2">
                       <p className="font-semibold text-blue-900">Verification</p>
-                      <span className="text-blue-700 font-bold">{app.verification.progress}%</span>
+                      <span className="text-blue-700 font-bold">{app.verification?.progress ?? 0}%</span>
                     </div>
                     <div className="w-full bg-blue-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="h-full bg-blue-600 rounded-full transition-all"
-                        style={{ width: `${app.verification.progress}%` }}
+                        style={{ width: `${app.verification?.progress ?? 0}%` }}
                       />
                     </div>
                     <p className="text-blue-700 mt-1">
-                      {app.verification.verified} / {app.verification.total} verified
+                      {app.verification?.verified ?? 0} / {app.verification?.total ?? 0} verified
                     </p>
                   </div>
                 )}
 
                 {/* Documentation Status */}
-                {app.documentation.submitted > 0 && (
+                {(app.documentation?.submitted ?? app.documents?.length ?? 0) > 0 && (
                   <div className="bg-purple-50 rounded p-3 mb-4 text-xs md:text-sm">
                     <p className="font-semibold text-purple-900 mb-2">Documents</p>
                     <div className="grid grid-cols-2 gap-2 text-purple-700">
-                      <div>✓ Submitted: <span className="font-bold">{app.documentation.submitted}</span></div>
-                      <div>✓ Approved: <span className="font-bold text-green-600">{app.documentation.approved}</span></div>
-                      {app.documentation.rejected > 0 && (
-                        <div>✗ Rejected: <span className="font-bold text-red-600">{app.documentation.rejected}</span></div>
+                      <div>✓ Submitted: <span className="font-bold">{app.documentation?.submitted ?? app.documents?.length ?? 0}</span></div>
+                      <div>✓ Approved: <span className="font-bold text-green-600">{app.documentation?.approved ?? 0}</span></div>
+                      {((app.documentation?.rejected ?? 0) > 0) && (
+                        <div>✗ Rejected: <span className="font-bold text-red-600">{app.documentation?.rejected ?? 0}</span></div>
                       )}
-                      {app.documentation.pending > 0 && (
-                        <div>⏳ Pending: <span className="font-bold text-yellow-600">{app.documentation.pending}</span></div>
+                      {((app.documentation?.pending ?? 0) > 0) && (
+                        <div>⏳ Pending: <span className="font-bold text-yellow-600">{app.documentation?.pending ?? 0}</span></div>
                       )}
                     </div>
                   </div>
@@ -666,12 +1065,12 @@ const OwnershipTransfer = () => {
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold text-gray-700">Overall Progress</span>
-                    <span className="text-xs font-bold text-gray-900">{app.progressPercentage}%</span>
+                    <span className="text-xs font-bold text-gray-900">{app.progressPercentage || 0}%</span>
                   </div>
                   <div className="w-full bg-gray-300 rounded-full h-2 overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${app.progressPercentage}%` }}
+                      animate={{ width: `${app.progressPercentage || 0}%` }}
                       transition={{ duration: 0.8, ease: "easeOut" }}
                       className={`h-full rounded-full transition-all ${
                         app.status === "APPROVED"
