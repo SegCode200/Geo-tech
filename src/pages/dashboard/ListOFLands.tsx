@@ -49,6 +49,9 @@ const LandRegistrationList = () => {
   const [filterType, setFilterType] = useState("ALL");
 
 
+  // console.log(JSON.stringify(data, null, 2))
+
+
 
   const handleDeleteLand = async (landId: string) => {
     setDeleting(true);

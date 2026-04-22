@@ -76,6 +76,41 @@ const SurveyPlan: React.FC<SurveyPlanProps> = ({ land, onClose }) => {
   const svgPoints = transformCoordinates(coordinates);
   const pathData = svgPoints.length > 0 ? `M ${svgPoints.map((p) => `${p.x},${p.y}`).join(' L ')} Z` : '';
 
+  // Calculate bearings if not provided (for coordinate surveys)
+  const getBearings = () => {
+    if (land.surveyType === "BEARING" && land.bearings) {
+      return land.bearings;
+    }
+    // Calculate bearings from coordinates
+    if (coordinates.length < 2) return [];
+    const bearings = [];
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const [lat1, lng1] = coordinates[i];
+      const [lat2, lng2] = coordinates[i + 1];
+      
+      const R = 6378137;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLng = ((lng2 - lng1) * Math.PI) / 180;
+      
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+      
+      const y = Math.sin(dLng) * Math.cos((lat2 * Math.PI) / 180);
+      const x = Math.cos((lat1 * Math.PI) / 180) * Math.sin((lat2 * Math.PI) / 180) -
+                Math.sin((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.cos(dLng);
+      const bearing = (Math.atan2(y, x) * 180) / Math.PI;
+      const normalizedBearing = (bearing + 360) % 360;
+      
+      bearings.push({ distance, bearing: normalizedBearing });
+    }
+    return bearings;
+  };
+
+  const bearings = getBearings();
+
   const downloadPlan = () => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -168,6 +203,20 @@ const SurveyPlan: React.FC<SurveyPlanProps> = ({ land, onClose }) => {
         ctx.fillStyle = '#0f172a';
         ctx.font = '12px Arial';
         ctx.fillText(`${index + 1}`, offsetX + point.x * 1.5 + 12, offsetY + point.y * 1.3 + 5);
+      });
+
+      // Add distance and bearing labels on lines
+      bearings.forEach((b, i) => {
+        if (!svgPoints[i + 1]) return;
+        const p1 = svgPoints[i];
+        const p2 = svgPoints[i + 1];
+        const midX = offsetX + ((p1.x + p2.x) / 2) * 1.5;
+        const midY = offsetY + ((p1.y + p2.y) / 2) * 1.3;
+        
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${b.distance.toFixed(1)}m / ${b.bearing.toFixed(1)}°`, midX, midY);
       });
     }
 
@@ -297,6 +346,25 @@ const SurveyPlan: React.FC<SurveyPlanProps> = ({ land, onClose }) => {
                         <text x={point.x + 84} y={point.y + 86} fontSize="12" fill="#0f172a" fontWeight="bold">{index + 1}</text>
                       </g>
                     ))}
+                    {/* Distance and Bearing Labels */}
+                    {bearings.map((b, i) => {
+                      if (!svgPoints[i + 1]) return null;
+                      const p1 = svgPoints[i];
+                      const p2 = svgPoints[i + 1];
+                      return (
+                        <text
+                          key={i}
+                          x={(p1.x + p2.x) / 2 + 70}
+                          y={(p1.y + p2.y) / 2 + 70}
+                          fontSize="10"
+                          fill="black"
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                        >
+                          {b.distance.toFixed(1)}m / {b.bearing.toFixed(1)}°
+                        </text>
+                      );
+                    })}
                   </>
                 )}
 

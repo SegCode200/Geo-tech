@@ -1,0 +1,7 @@
+    const a = document.createElement("a");
+    a.download = "survey-plan.png";
+    a.href = canvas.toDataURL();
+    a.click();
+  };
+
+  return (
