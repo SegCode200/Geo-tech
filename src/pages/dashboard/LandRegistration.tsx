@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { errorToast, successToast } from "../../utils/toast";
 import { getApiErrorMessage } from "../../utils/apiError";
 import * as authApi from "../../api/auth";
+import { api } from "../../api/interceptors";
 import {
   FaArrowLeft,
   FaMapMarkerAlt,
@@ -25,7 +26,7 @@ const LandRegistration = () => {
     ownerName: "",
     surveyType: "COORDINATE", // "COORDINATE" or "BEARING"
     coordinates: [{ lat: "", lng: "" }, { lat: "", lng: "" }, { lat: "", lng: "" }, { lat: "", lng: "" }],
-    bearings: [{ distance: "", bearing: "" }, { distance: "", bearing: "" }, { distance: "", bearing: "" }],
+    bearings: [{ distance: "", bearing: "", degrees: "", minutes: "" }, { distance: "", bearing: "", degrees: "", minutes: "" }, { distance: "", bearing: "", degrees: "", minutes: "" }],
     startPoint: { lat: "", lng: "" },
     utmZone: "",
     ownershipType: "",
@@ -43,14 +44,24 @@ const LandRegistration = () => {
     surveyNotes: "",
     accuracyLevel: "",
     measuredAreaSqm: "",
+    hasExistingCofO: false,
+    existingCofONumber: "",
+    existingCofOIssueDate: "",
+    paymentReference: "",
+    paymentAmount: "",
   });
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [states, setStates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [verificationResult, setVerificationResult] = useState<any | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState("");
+
+  // New states for payment and conflicts
 
   // Fetch States on Component Mount
   useEffect(() => {
@@ -66,28 +77,15 @@ const LandRegistration = () => {
     fetchStates();
   }, []);
 
-  // Fetch States on Component Mount
-  useEffect(() => {
-    const fetchStates = async () => {
-      try {
-        const response = await authApi.getStates();
-        setStates(response.state || response);
-      } catch (error) {
-        console.error("Error fetching states:", error);
-        errorToast("Failed to load states");
-      }
-    };
-    fetchStates();
-  }, []);
 
   // Handle Input Change
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target as HTMLInputElement;
     setFormValues((prevData) => ({
       ...prevData,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
@@ -113,16 +111,112 @@ const LandRegistration = () => {
   };
 
   // Handle Bearings Change
-  const handleBearingChange = (index: number, field: 'distance' | 'bearing', value: string) => {
+  const handleBearingChange = (index: number, field: 'distance' | 'bearing' | 'degrees' | 'minutes', value: string) => {
     const updatedBearings = [...formValues.bearings];
     updatedBearings[index] = { ...updatedBearings[index], [field]: value };
     setFormValues((prev) => ({ ...prev, bearings: updatedBearings }));
   };
 
+  // Calculate Bearing from Degrees and Minutes
+  const handleCalculateBearing = (index: number) => {
+    const bearing = formValues.bearings[index];
+    const degrees = parseFloat(bearing.degrees);
+    const minutes = parseFloat(bearing.minutes);
+
+    if (isNaN(degrees) || isNaN(minutes)) {
+      errorToast("Please enter valid degree and minute values");
+      return;
+    }
+
+    if (degrees < 0 || degrees > 360) {
+      errorToast("Degrees must be between 0 and 360");
+      return;
+    }
+
+    if (minutes < 0 || minutes > 59) {
+      errorToast("Minutes must be between 0 and 59");
+      return;
+    }
+
+    // Convert to decimal bearing
+    const decimalBearing = degrees + minutes / 60;
+    const updatedBearings = [...formValues.bearings];
+    updatedBearings[index] = { ...updatedBearings[index], bearing: decimalBearing.toFixed(4) };
+    setFormValues((prev) => ({ ...prev, bearings: updatedBearings }));
+    successToast(`Bearing calculated: ${decimalBearing.toFixed(4)}°`);
+  };
+
+  const handlePayment = async () => {
+    if (!verificationResult?.canRegister) {
+      errorToast("Please verify the land before making payment.");
+      return;
+    }
+
+    if (!formValues.paymentAmount || Number(formValues.paymentAmount) <= 0) {
+      errorToast("Payment amount is required to initialize payment.");
+      return;
+    }
+
+    setPaymentProcessing(true);
+    try {
+      const areaSqm = verificationResult?.areaSqm || Number(formValues.measuredAreaSqm);
+      if (!areaSqm || isNaN(areaSqm) || areaSqm <= 0) {
+        errorToast("Valid land area is required to initialize payment.");
+        setPaymentProcessing(false);
+        return;
+      }
+
+      const { data } = await api.post("/lands/initiate-payment", {
+        areaSqm,
+      });
+
+      const payment = data?.payment;
+      if (!payment) {
+        throw new Error("Payment initialization failed: missing payment data.");
+      }
+
+      setFormValues((prev) => ({
+        ...prev,
+        paymentAmount: data.fee?.toString() || prev.paymentAmount,
+        paymentReference: payment.reference || prev.paymentReference,
+      }));
+
+      if (payment.authorization_url) {
+        setPaymentUrl(payment.authorization_url);
+        setShowPaymentModal(true);
+        successToast("Payment modal opened. Complete the payment to generate a reference.");
+      } else {
+        successToast("Payment initialized successfully.");
+      }
+    } catch (err: any) {
+      console.error("Payment initialization error:", err);
+      const errorMsg = getApiErrorMessage(err);
+      errorToast(`Unable to initialize payment: ${errorMsg}`);
+    } finally {
+      setPaymentProcessing(false);
+    }
+  };
+
+  const parseBearingValue = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const dmsMatch = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)\s*[°º]?\s*([0-9]+(?:\.[0-9]+)?)\s*['’]?\s*([0-9]+(?:\.[0-9]+)?)?\s*(?:["”])?$/);
+    if (dmsMatch) {
+      const degrees = parseFloat(dmsMatch[1]);
+      const minutes = parseFloat(dmsMatch[2]);
+      const seconds = dmsMatch[3] ? parseFloat(dmsMatch[3]) : 0;
+      return degrees + minutes / 60 + seconds / 3600;
+    }
+
+    const numeric = Number(trimmed.replace(",", "."));
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+
   const addBearing = () => {
     setFormValues((prev) => ({
       ...prev,
-      bearings: [...prev.bearings, { distance: "", bearing: "" }],
+      bearings: [...prev.bearings, { distance: "", bearing: "", degrees: "", minutes: "" }],
     }));
   };
 
@@ -296,7 +390,10 @@ const LandRegistration = () => {
       for (let i = 0; i < formValues.bearings.length; i++) {
         const bearing = formValues.bearings[i];
         if (!bearing.distance || isNaN(parseFloat(bearing.distance))) newErrors[`bearings_${i}_distance`] = `Bearing ${i + 1}: Invalid distance.`;
-        if (!bearing.bearing || isNaN(parseFloat(bearing.bearing))) newErrors[`bearings_${i}_bearing`] = `Bearing ${i + 1}: Invalid bearing.`;
+        const parsedBearing = parseBearingValue(bearing.bearing);
+        if (parsedBearing === null || parsedBearing < 0 || parsedBearing >= 360) {
+          newErrors[`bearings_${i}_bearing`] = `Bearing ${i + 1}: Enter a valid bearing like 45.5 or 81° 53'.`;
+        }
       }
       if (!formValues.startPoint.lat || isNaN(parseFloat(formValues.startPoint.lat))) newErrors.startPoint_lat = "Invalid start point Easting (mE).";
       if (!formValues.startPoint.lng || isNaN(parseFloat(formValues.startPoint.lng))) newErrors.startPoint_lng = "Invalid start point Northing (mN).";
@@ -313,6 +410,11 @@ const LandRegistration = () => {
     if (uploadedFiles.length === 0) newErrors.documents = "At least one document is required.";
     if (formValues.measuredAreaSqm && (isNaN(parseFloat(formValues.measuredAreaSqm)) || parseFloat(formValues.measuredAreaSqm) <= 0)) {
       newErrors.measuredAreaSqm = "Measured area must be a positive number.";
+    }
+
+    if (formValues.hasExistingCofO) {
+      if (!formValues.existingCofONumber) newErrors.existingCofONumber = "Existing C of O number is required.";
+      if (!formValues.existingCofOIssueDate) newErrors.existingCofOIssueDate = "Existing C of O issue date is required.";
     }
     
     // Log errors to console for debugging
@@ -347,7 +449,8 @@ const LandRegistration = () => {
     } else if (formValues.surveyType === "BEARING") {
       for (let i = 0; i < formValues.bearings.length; i++) {
         const bearing = formValues.bearings[i];
-        if (!bearing.distance || !bearing.bearing || isNaN(parseFloat(bearing.distance)) || isNaN(parseFloat(bearing.bearing))) {
+        const parsedBearing = parseBearingValue(bearing.bearing);
+        if (!bearing.distance || isNaN(parseFloat(bearing.distance)) || parsedBearing === null) {
           errorToast(`Please enter valid distance and bearing for Bearing ${i + 1}`);
           return;
         }
@@ -362,32 +465,78 @@ const LandRegistration = () => {
       }
     }
 
+    if (formValues.hasExistingCofO) {
+      if (!formValues.existingCofONumber) {
+        setErrors(prev => ({ ...prev, existingCofONumber: "Existing C of O number is required." }));
+        errorToast("Existing C of O number is required when you already have an existing CofO.");
+        return;
+      }
+      if (!formValues.existingCofOIssueDate) {
+        setErrors(prev => ({ ...prev, existingCofOIssueDate: "Existing C of O issue date is required when you already have an existing CofO." }));
+        errorToast("Existing C of O issue date is required when you already have an existing CofO.");
+        return;
+      }
+    }
+
     setVerifying(true);
     try {
-      const verificationData = {
+      // Build verification data with required fields set to empty/default values
+      const verificationData: any = {
         surveyType: formValues.surveyType,
-        coordinates: formValues.surveyType === "COORDINATE" 
-          ? formValues.coordinates.map(c => [parseFloat(c.lat), parseFloat(c.lng)])
-          : undefined,
-        bearings: formValues.surveyType === "BEARING"
-          ? formValues.bearings.map(b => ({ distance: parseFloat(b.distance), bearing: parseFloat(b.bearing) }))
-          : undefined,
-        startPoint: formValues.surveyType === "BEARING"
-          ? [parseFloat(formValues.startPoint.lat), parseFloat(formValues.startPoint.lng)]
-          : undefined,
-        utmZone: formValues.utmZone,
-        stateId: formValues.state || undefined,
+        ownerName: formValues.ownerName || "",
+        ownershipType: formValues.ownershipType || "",
+        purpose: formValues.purpose || "",
+        titleType: formValues.titleType || "",
+        stateId: formValues.state || "",
+        surveyorName: formValues.surveyorName || "",
+        accuracyLevel: formValues.accuracyLevel || "SURVEYED", // Default to SURVEYED for verification
       };
+
+      if (formValues.surveyType === "COORDINATE") {
+        verificationData.coordinates = formValues.coordinates.map(c => [parseFloat(c.lat), parseFloat(c.lng)]);
+      } else if (formValues.surveyType === "BEARING") {
+        verificationData.bearings = formValues.bearings.map(b => ({
+          distance: parseFloat(b.distance),
+          bearing: parseFloat(b.bearing)
+        }));
+        verificationData.startPoint = [parseFloat(formValues.startPoint.lat), parseFloat(formValues.startPoint.lng)];
+      }
+
+      verificationData.utmZone = formValues.utmZone;
+
+      // Optional fields - only add if populated
+      if (formValues.surveyPlanNumber) {
+        verificationData.surveyPlanNumber = formValues.surveyPlanNumber;
+      }
+      if (formValues.measuredAreaSqm && !isNaN(parseFloat(formValues.measuredAreaSqm))) {
+        verificationData.measuredAreaSqm = parseFloat(formValues.measuredAreaSqm);
+      }
+      if (formValues.hasExistingCofO) {
+        verificationData.hasExistingCofO = true;
+        if (formValues.existingCofONumber) {
+          verificationData.existingCofONumber = formValues.existingCofONumber;
+        }
+        if (formValues.existingCofOIssueDate) {
+          verificationData.existingCofOIssueDate = formValues.existingCofOIssueDate;
+        }
+      }
 
       const response = await authApi.verifyLand(verificationData);
       setVerificationResult(response);
 
-      if (response.riskLevel === "SAFE") {
-        successToast("✓ Land verification successful! This land is available for registration.");
+      console.log("Verification Data", response)
+      if (response.fee) {
+        setFormValues(prev => ({ ...prev, paymentAmount: response.fee.toString() }));
+      }
+
+      if (response.canRegister) {
+        successToast("✓ Land verification successful! You can now enter your payment reference and register.");
       } else if (response.riskLevel === "GOVERNMENT") {
-        errorToast("⚠ This land belongs to government. See details below.");
-      } else {
-        errorToast("⚠ This land overlaps with existing properties. See details below.");
+        errorToast("⚠ Government land detected. Review the details below.");
+      } else if (response.conflicts && response.conflicts.length > 0) {
+        errorToast("⚠ This land overlaps with existing registered properties. Review the details below.");
+      } else if (response.duplicateIssues && response.duplicateIssues.length > 0) {
+        errorToast("⚠ Duplicate data found. Please correct the highlighted fields.");
       }
     } catch (error: any) {
       console.error("Verification error:", error);
@@ -402,12 +551,19 @@ const LandRegistration = () => {
   // Handle Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verificationResult || verificationResult.riskLevel !== "SAFE") {
-      errorToast("Please verify the land first and ensure it's safe for registration");
+
+    if (!verificationResult || !verificationResult.canRegister) {
+      errorToast("Please verify the land and resolve registration issues before submitting.");
       return;
     }
     if (!validateForm()) {
       errorToast("Please fix all validation errors before submitting. Check the errors shown in the form.");
+      return;
+    }
+
+    if (!formValues.paymentReference.trim()) {
+      setErrors(prev => ({ ...prev, paymentReference: "Payment reference is required." }));
+      errorToast("Payment reference is required to complete registration.");
       return;
     }
 
@@ -432,10 +588,19 @@ const LandRegistration = () => {
       formDataObj.append("utmZone", formValues.utmZone);
     }
 
-    formDataObj.append("ownershipType", formValues.ownershipType);
-    formDataObj.append("purpose", formValues.purpose);
-    formDataObj.append("titleType", formValues.titleType);
-    formDataObj.append("stateId", formValues.state);
+    // Only append fields if they have values
+    if (formValues.ownershipType) {
+      formDataObj.append("ownershipType", formValues.ownershipType);
+    }
+    if (formValues.purpose) {
+      formDataObj.append("purpose", formValues.purpose);
+    }
+    if (formValues.titleType) {
+      formDataObj.append("titleType", formValues.titleType);
+    }
+    if (formValues.state) {
+      formDataObj.append("stateId", formValues.state);
+    }
     if (formValues.address) {
       formDataObj.append("address", formValues.address);
     }
@@ -445,11 +610,15 @@ const LandRegistration = () => {
     if (formValues.parentLandId) {
       formDataObj.append("parentLandId", formValues.parentLandId);
     }
-    formDataObj.append("surveyPlanNumber", formValues.surveyPlanNumber);
+    if (formValues.surveyPlanNumber) {
+      formDataObj.append("surveyPlanNumber", formValues.surveyPlanNumber);
+    }
     if (formValues.surveyDate) {
       formDataObj.append("surveyDate", formValues.surveyDate);
     }
-    formDataObj.append("surveyorName", formValues.surveyorName);
+    if (formValues.surveyorName) {
+      formDataObj.append("surveyorName", formValues.surveyorName);
+    }
     if (formValues.surveyorAddress) {
       formDataObj.append("surveyorAddress", formValues.surveyorAddress);
     }
@@ -459,10 +628,24 @@ const LandRegistration = () => {
     if (formValues.surveyNotes) {
       formDataObj.append("surveyNotes", formValues.surveyNotes);
     }
-    formDataObj.append("accuracyLevel", formValues.accuracyLevel);
+    if (formValues.accuracyLevel) {
+      formDataObj.append("accuracyLevel", formValues.accuracyLevel);
+    }
     const measuredArea = formValues.measuredAreaSqm ? formValues.measuredAreaSqm.trim() : "";
     if (measuredArea && !isNaN(parseFloat(measuredArea)) && parseFloat(measuredArea) > 0) {
       formDataObj.append("measuredAreaSqm", measuredArea);
+    }
+
+    formDataObj.append("hasExistingCofO", formValues.hasExistingCofO ? "true" : "false");
+    if (formValues.hasExistingCofO) {
+      formDataObj.append("existingCofONumber", formValues.existingCofONumber);
+      formDataObj.append("existingCofOIssueDate", formValues.existingCofOIssueDate);
+    }
+    if (formValues.paymentAmount) {
+      formDataObj.append("paymentAmount", formValues.paymentAmount);
+    }
+    if (formValues.paymentReference) {
+      formDataObj.append("paymentReference", formValues.paymentReference);
     }
 
     // Append all files
@@ -475,7 +658,7 @@ const LandRegistration = () => {
     try {
       const response = await authApi.landRegisteration(formDataObj);
       console.log("Land registration response:", response);
-      successToast("Land registered successfully!");
+      successToast("Land registered successfully. Payment has been verified and the land is now created.");
       navigate("/dashboard/list-of-registrations");
     } catch (error: any) {
       console.error("Land registration error:", error);
@@ -486,6 +669,7 @@ const LandRegistration = () => {
     }
   };
 
+  // Handle Conflict Acknowledgment
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 md:p-8">
       <div className="max-w-6xl mx-auto">
@@ -760,30 +944,75 @@ const LandRegistration = () => {
                           className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg"
                         >
                           <span className="text-sm font-medium text-slate-600 min-w-[100px]">BAU {1901 + index}:</span>
-                          <div className="flex gap-4 flex-1">
-                            <div className="flex-1">
-                              <input
-                                type="number"
-                                placeholder="Distance (meters) e.g., 150.75"
-                                value={bearing.distance}
-                                onChange={(e) => handleBearingChange(index, 'distance', e.target.value)}
-                                step="0.01"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                              />
-                              {errors[`bearings_${index}_distance`] && (
-                                <p className="text-red-500 text-xs mt-1">{errors[`bearings_${index}_distance`]}</p>
-                              )}
+                          <div className="flex flex-col gap-3 flex-1">
+                            <div className="flex gap-3 items-end">
+                              {/* Distance */}
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Distance (m)</label>
+                                <input
+                                  type="number"
+                                  placeholder="e.g., 150.75"
+                                  value={bearing.distance}
+                                  onChange={(e) => handleBearingChange(index, 'distance', e.target.value)}
+                                  step="0.01"
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                />
+                                {errors[`bearings_${index}_distance`] && (
+                                  <p className="text-red-500 text-xs mt-1">{errors[`bearings_${index}_distance`]}</p>
+                                )}
+                              </div>
+
+                              {/* Degrees */}
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Degrees</label>
+                                <input
+                                  type="number"
+                                  placeholder="e.g., 81°"
+                                  value={bearing.degrees}
+                                  onChange={(e) => handleBearingChange(index, 'degrees', e.target.value)}
+                                  min="0"
+                                  max="360"
+                                  step="0.01"
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                />
+                              </div>
+
+                              {/* Minutes */}
+                              <div className="flex-1">
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Minutes</label>
+                                <input
+                                  type="number"
+                                  placeholder="e.g., 53'"
+                                  value={bearing.minutes}
+                                  onChange={(e) => handleBearingChange(index, 'minutes', e.target.value)}
+                                  min="0"
+                                  max="59"
+                                  step="0.01"
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                />
+                              </div>
+
+                              {/* Calculate Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleCalculateBearing(index)}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 whitespace-nowrap text-sm font-medium"
+                                title="Calculate bearing from degrees and minutes"
+                              >
+                                <FaCompass className="text-sm" />
+                                Calculate
+                              </button>
                             </div>
-                            <div className="flex-1">
+
+                            {/* Bearing Display */}
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Calculated Bearing (decimal)</label>
                               <input
-                                type="number"
-                                placeholder="Bearing (degrees) e.g., 45.5"
+                                type="text"
+                                placeholder="Result will appear here"
                                 value={bearing.bearing}
-                                onChange={(e) => handleBearingChange(index, 'bearing', e.target.value)}
-                                step="0.1"
-                                min="0"
-                                max="360"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                readOnly
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-700 focus:outline-none"
                               />
                               {errors[`bearings_${index}_bearing`] && (
                                 <p className="text-red-500 text-xs mt-1">{errors[`bearings_${index}_bearing`]}</p>
@@ -794,7 +1023,7 @@ const LandRegistration = () => {
                             <button
                               type="button"
                               onClick={() => removeBearing(index)}
-                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg flex-shrink-0"
                               title="Remove bearing"
                             >
                               <FaTrash />
@@ -1021,6 +1250,61 @@ const LandRegistration = () => {
                     <p className="text-red-500 text-sm mt-2">{errors.titleType}</p>
                   )}
                 </div>
+                {formValues.titleType === "certificate-of-occupancy" && (
+                  <div className="md:col-span-3 bg-slate-50 rounded-2xl border border-slate-200 p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <input
+                        id="hasExistingCofO"
+                        type="checkbox"
+                        name="hasExistingCofO"
+                        checked={formValues.hasExistingCofO}
+                        onChange={handleChange}
+                        className="h-5 w-5 text-orange-600 border-slate-300 rounded"
+                      />
+                      <label htmlFor="hasExistingCofO" className="font-semibold text-slate-700">
+                        I already have an existing Certificate of Occupancy (C of O)
+                      </label>
+                    </div>
+                    <p className="text-sm text-slate-500 mb-4">
+                      If this land already has a valid C of O, provide the document number and issue date for verification.
+                    </p>
+                    {formValues.hasExistingCofO && (
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 uppercase mb-2">
+                            Existing C of O Number <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="existingCofONumber"
+                            value={formValues.existingCofONumber}
+                            onChange={handleChange}
+                            placeholder="Enter existing C of O number"
+                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all bg-slate-50"
+                          />
+                          {errors.existingCofONumber && (
+                            <p className="text-red-500 text-sm mt-2">{errors.existingCofONumber}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 uppercase mb-2">
+                            Existing C of O Issue Date <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            name="existingCofOIssueDate"
+                            value={formValues.existingCofOIssueDate}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all bg-slate-50"
+                          />
+                          {errors.existingCofOIssueDate && (
+                            <p className="text-red-500 text-sm mt-2">{errors.existingCofOIssueDate}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 uppercase mb-2">
                     State <span className="text-red-500">*</span>
@@ -1365,99 +1649,244 @@ const LandRegistration = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className={`rounded-lg p-6 mb-6 ${
-                    verificationResult.riskLevel === "SAFE"
+                    verificationResult.canRegister
                       ? "bg-green-50 border border-green-300"
                       : "bg-red-50 border border-red-300"
                   }`}
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`text-3xl ${verificationResult.riskLevel === "SAFE" ? "text-green-600" : "text-red-600"}`}>
-                      {verificationResult.riskLevel === "SAFE" ? "✓" : "⚠"}
+                    <div className={`text-3xl ${verificationResult.canRegister ? "text-green-600" : "text-red-600"}`}>
+                      {verificationResult.canRegister ? "✓" : "⚠"}
                     </div>
                     <div className="flex-1">
-                      <h3 className={`text-lg font-bold mb-2 ${verificationResult.riskLevel === "SAFE" ? "text-green-800" : "text-red-800"}`}>
-                        {verificationResult.riskLevel === "SAFE"
+                      <h3 className={`text-lg font-bold mb-2 ${verificationResult.canRegister ? "text-green-800" : "text-red-800"}`}>
+                        {verificationResult.canRegister
                           ? "Land is Available for Registration"
                           : verificationResult.riskLevel === "GOVERNMENT"
                             ? "Government Land Detected"
                             : "Overlapping Property Detected"}
                       </h3>
-                      <p className={verificationResult.riskLevel === "SAFE" ? "text-green-700" : "text-red-700"}>
-                        {verificationResult.riskLevel === "SAFE"
-                          ? "Your land boundaries don't overlap with any registered properties. You can proceed with registration."
+                      <p className={verificationResult.canRegister ? "text-green-700" : "text-red-700"}>
+                        {verificationResult.canRegister
+                          ? "Your land boundaries are valid for registration. Complete payment reference and submit."
                           : verificationResult.riskLevel === "GOVERNMENT"
-                            ? "This land or parts of it belong to the government. You may need approval or further investigation."
-                            : `Your land boundaries overlap with ${verificationResult.existingOwners?.length || 1} existing registered propert${verificationResult.existingOwners?.length !== 1 ? "ies" : "y"}. See details below.`}
+                            ? "This land or parts of it belong to the government. Review the details below."
+                            : `Your land boundaries overlap with ${verificationResult.conflicts?.length || 1} existing registered propert${verificationResult.conflicts?.length !== 1 ? "ies" : "y"}. See details below.`}
                       </p>
                     </div>
                   </div>
+
+                  {verificationResult.fee !== undefined && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border border-green-200">
+                      <p className="text-sm text-slate-500">Expected Land Registration Fee</p>
+                      <p className="text-2xl font-bold text-slate-900">₦{Number(verificationResult.fee).toLocaleString()}</p>
+                    </div>
+                  )}
+
+                  {verificationResult.duplicateIssues && verificationResult.duplicateIssues.length > 0 && (
+                    <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <p className="text-sm font-semibold text-yellow-700">Duplicate data detected. Please resolve before registering.</p>
+                      <ul className="mt-2 list-disc list-inside text-sm text-yellow-800 space-y-1">
+                        {verificationResult.duplicateIssues.map((issue: any, index: number) => (
+                          <li key={index}>{issue.field}: {issue.message}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </motion.div>
               )}
 
               {/* Existing Owner Details */}
-              {verificationResult && verificationResult.riskLevel !== "SAFE" && verificationResult.existingOwners && verificationResult.existingOwners.length > 0 && (
+              {verificationResult && verificationResult.conflicts && verificationResult.conflicts.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-slate-50 rounded-lg p-6"
                 >
                   <h4 className="text-lg font-bold text-slate-800 mb-4">
-                    Overlapping Properties Details:
+                    Overlapping Property Details
                   </h4>
                   <div className="space-y-4">
-                    {verificationResult.existingOwners.map((owner: any, index: number) => (
+                    {verificationResult.conflicts.map((owner: any, index: number) => (
                       <div
                         key={index}
                         className={`p-4 rounded-lg border-l-4 ${
-                          owner.ownershipType === "government"
+                          /gov/i.test(owner.ownershipType || "")
                             ? "bg-red-50 border-l-red-500"
                             : "bg-orange-50 border-l-orange-500"
                         }`}
                       >
-                        <div className="grid md:grid-cols-2 gap-4">
+                        <div className="grid md:grid-cols-2 gap-4 mb-4">
                           <div>
                             <p className="text-sm font-semibold text-slate-600">Owner Name</p>
                             <p className="text-slate-900 font-bold">{owner.ownerName || "N/A"}</p>
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-slate-600">Ownership Type</p>
-                            <p className={`font-bold ${owner.ownershipType === "government" ? "text-red-700" : "text-orange-700"}`}>
-                              {owner.ownershipType === "government" ? "🏛️ Government" : "👤 Private"}
+                            <p className={`font-bold ${/gov/i.test(owner.ownershipType || "") ? "text-red-700" : "text-orange-700"}`}>
+                              {owner.ownershipType || "Unknown"}
                             </p>
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-slate-600">Email</p>
-                            <p className="text-slate-900">{owner.email || "Not provided"}</p>
+                            <p className="text-slate-900">{owner.ownerEmail || "Not provided"}</p>
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-slate-600">Phone</p>
-                            <p className="text-slate-900">{owner.phone || "Not provided"}</p>
+                            <p className="text-slate-900">{owner.ownerPhone || "Not provided"}</p>
                           </div>
-                          {owner.titleType && (
-                            <div>
-                              <p className="text-sm font-semibold text-slate-600">Title Type</p>
-                              <p className="text-slate-900">{owner.titleType}</p>
-                            </div>
-                          )}
-                          {owner.landStatus && (
-                            <div>
-                              <p className="text-sm font-semibold text-slate-600">Status</p>
-                              <p className="text-slate-900">{owner.landStatus}</p>
-                            </div>
-                          )}
                         </div>
-                        {owner.purpose && (
-                          <div className="mt-3 pt-3 border-t border-slate-300">
-                            <p className="text-sm font-semibold text-slate-600">Land Purpose</p>
-                            <p className="text-slate-900">{owner.purpose}</p>
+                        <div className="grid md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="font-semibold text-slate-700">Land Code</p>
+                            <p className="text-slate-900">{owner.landCode || "N/A"}</p>
+                            <p className="font-semibold text-slate-700 mt-2">Area</p>
+                            <p className="text-slate-900">{owner.areaSqm ?? "N/A"} m²</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-700">Title Type</p>
+                            <p className="text-slate-900">{owner.titleType || "N/A"}</p>
+                            <p className="font-semibold text-slate-700 mt-2">Status</p>
+                            <p className="text-slate-900">{owner.landStatus || "N/A"}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 text-sm text-slate-700">
+                          <p><span className="font-semibold">Address:</span> {owner.address || "N/A"}</p>
+                          <p><span className="font-semibold">Survey Plan:</span> {owner.surveyPlanNumber || "N/A"}</p>
+                          <p><span className="font-semibold">Survey Date:</span> {owner.surveyDate ? new Date(owner.surveyDate).toLocaleDateString() : "N/A"}</p>
+                          <p><span className="font-semibold">Surveyor:</span> {owner.surveyorName || "N/A"}</p>
+                        </div>
+                        {owner.documents && owner.documents.length > 0 && (
+                          <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
+                            <p className="font-semibold text-slate-700 mb-2">Registered Documents</p>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                              {owner.documents.map((doc: any) => (
+                                <li key={doc.id}>
+                                  <a href={doc.documentUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                                    {doc.fileName || doc.title || "Document"}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {owner.ownershipTransfers && owner.ownershipTransfers.length > 0 && (
+                          <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
+                            <p className="font-semibold text-slate-700 mb-2">Ownership Transfer History</p>
+                            <ul className="space-y-2 text-sm">
+                              {owner.ownershipTransfers.map((transfer: any) => (
+                                <li key={transfer.id} className="border border-slate-200 rounded-lg p-3">
+                                  <p><span className="font-semibold">Transfer Type:</span> {transfer.transferType}</p>
+                                  <p><span className="font-semibold">Status:</span> {transfer.status}</p>
+                                  <p><span className="font-semibold">Current Owner:</span> {transfer.currentOwner?.fullName || "N/A"}</p>
+                                  <p><span className="font-semibold">New Owner:</span> {transfer.newOwner?.fullName || "N/A"}</p>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {owner.cofOApplications && owner.cofOApplications.length > 0 && (
+                          <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
+                            <p className="font-semibold text-slate-700 mb-2">Related CofO Applications</p>
+                            <ul className="space-y-2 text-sm">
+                              {owner.cofOApplications.map((application: any) => (
+                                <li key={application.id} className="border border-slate-200 rounded-lg p-3">
+                                  <p><span className="font-semibold">Application:</span> {application.applicationNumber || "N/A"}</p>
+                                  <p><span className="font-semibold">Status:</span> {application.status || "N/A"}</p>
+                                  <p><span className="font-semibold">CofO Number:</span> {application.cofONumber || "N/A"}</p>
+                                  <p><span className="font-semibold">Signed At:</span> {application.signedAt ? new Date(application.signedAt).toLocaleDateString() : "N/A"}</p>
+                                  {application.cofODocuments && application.cofODocuments.length > 0 && (
+                                    <div className="mt-2">
+                                      <p className="font-semibold">Application Documents:</p>
+                                      <ul className="list-disc list-inside text-slate-700">
+                                        {application.cofODocuments.map((doc: any) => (
+                                          <li key={doc.id}>
+                                            <a href={doc.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                                              {doc.title || doc.type || "Document"}
+                                            </a>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
-                  <p className="text-sm text-slate-600 mt-4 p-4 bg-slate-100 rounded">
-                    💡 <strong>Tip:</strong> If you believe there's an error in the overlap detection or if you have permission from the overlapping owner, please contact support for manual review.
+                </motion.div>
+              )}
+
+              {verificationResult?.canRegister && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white rounded-lg border border-slate-200 p-6 mb-6"
+                >
+                  <h4 className="text-lg font-bold text-slate-800 mb-4">Payment Reference</h4>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Complete your Paystack payment for the amount below. The reference is generated automatically after a successful payment.
                   </p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 uppercase mb-2">Payment Amount</label>
+                      <input
+                        type="text"
+                        name="paymentAmount"
+                        value={formValues.paymentAmount}
+                        readOnly
+                        className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-slate-100 text-slate-700"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Amount from verification</p>
+                    </div>
+                    <div className="flex flex-col justify-between gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 uppercase mb-2">Payment Reference</label>
+                        <input
+                          type="text"
+                          name="paymentReference"
+                          value={formValues.paymentReference}
+                          readOnly
+                          placeholder="Reference will appear here after payment"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-slate-100 text-slate-700"
+                        />
+                        {formValues.paymentReference ? (
+                          <p className="text-xs text-green-600 mt-2">Payment completed successfully.</p>
+                        ) : (
+                          <p className="text-xs text-slate-500 mt-2">Click the Pay button below to initialize Paystack and generate a reference.</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePayment}
+                        disabled={paymentProcessing}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {paymentProcessing ? (
+                          <>
+                            <svg
+                              className="animate-spin h-5 w-5"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Initializing Payment...
+                          </>
+                        ) : (
+                          <>
+                            <FaCheckCircle />
+                            Pay with Paystack
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </div>
@@ -1517,6 +1946,47 @@ const LandRegistration = () => {
             </button>
           </motion.div>
         </form>
+
+        {/* Payment Modal */}
+        {showPaymentModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden"
+            >
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-lg font-bold text-slate-800">Complete Payment</h3>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="text-slate-500 hover:text-slate-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-4">
+                <iframe
+                  src={paymentUrl}
+                  className="w-full h-[600px] border-0"
+                  title="Payment"
+                />
+              </div>
+              <div className="p-4 border-t bg-slate-50">
+                <p className="text-sm text-slate-600 mb-4">
+                  Complete your payment in the iframe above. After successful payment, close this modal to continue with registration.
+                </p>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
+                >
+                  Close Modal
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
       </div>
     </div>
   );

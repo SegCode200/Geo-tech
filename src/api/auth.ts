@@ -184,4 +184,42 @@ export async function searchLands(
     throw normalizeAxiosError(error);
   }
 }
+
+// New API functions for payment and conflicts
+export async function confirmPaymentLand(paymentId: string, status: "SUCCESS" | "FAILED" | "UNPAID") {
+  try {
+    const res = await api.post("/lands/confirm-payment", { paymentId, status });
+    return res.data;
+  } catch (error) {
+    throw normalizeAxiosError(error);
+  }
+}
+
+export async function getLandConflicts(landId: string) {
+  try {
+    const res = await api.get(`/lands/conflicts/${landId}`);
+    return res.data;
+  } catch (error) {
+    throw normalizeAxiosError(error);
+  }
+}
+
+export async function acknowledgeLandConflict(conflictId: string, acknowledged: boolean) {
+  try {
+    const res = await api.post("/lands/acknowledge-conflict", { conflictId, acknowledged });
+    return res.data;
+  } catch (error) {
+    throw normalizeAxiosError(error);
+  }
+}
+
+export async function getConflictDocument(conflictId: string) {
+  try {
+    const res = await api.get(`/lands/conflict-document/${conflictId}`);
+    return res.data;
+  } catch (error) {
+    throw normalizeAxiosError(error);
+  }
+}
+
 export default api;
